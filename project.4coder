@@ -1,0 +1,41 @@
+
+version(2);
+project_name = "base";
+
+patterns = {
+    "*.cpp",
+    "*.h",
+    "*build.bat",
+    "*build_clang.bat",
+    "*.4coder",
+};
+//blacklist_patterns = {
+//};
+
+load_paths_base = {
+    { .path = ".", .relative = true, .recursive = false, },
+    { .path = "code", .relative = true, .recursive = false, },
+};
+load_paths = {
+    .win = load_paths_base,
+};
+
+commands = {
+    .build = { .out = "*compilation*", .footer_panel = true, .save_dirty_files = true,
+        .win = "build.bat"},
+    
+    .run = { .out = "*run*", .footer_panel = true, .save_dirty_files = false,
+        .win = "build\base_test.exe"},
+    
+    .buildrun = { .out = "*compilation*", .footer_panel = true, .save_dirty_files = true,
+        .win = "build_and_run.bat"},
+    
+    .build_clang = { .out = "*compilation*", .footer_panel = true, .save_dirty_files = true,
+        .win = "build_clang.bat"},
+};
+fkey_command = {
+    .F1 = "build",
+    .F2 = "run",
+    .F3 = "buildrun",
+    .F4 = "build_clang",
+};
