@@ -1,7 +1,8 @@
 
 #include "base.h"
-#include "base.cpp"
 #include "platform.h"
+#include "base.cpp"
+#include "ring_buffer.h"
 
 #include <windows.h>
 
@@ -48,16 +49,16 @@ string UTF8FromUTF16(arena *Arena, wchar_t *String16, u32 String16Length)
 {
     Assert(String16Length > 0);
     
-    int Capacity = (String16Length * 4);
-    u8 *Buffer = Allocate(Arena, Capacity, u8);
+    u32 Capacity = (String16Length * 4);
+    u8 *Buffer = PushArray(Arena, Capacity, u8);
     
     // Returns 0 on failure
     int ByteCount = WideCharToMultiByte(CP_UTF8, 0, 
-                                        String16, String16Length, 
-                                        (char *)Buffer, Capacity, 
+                                        String16, (int)String16Length, 
+                                        (char *)Buffer, (int)Capacity, 
                                         NULL, NULL);
     PopSize(Arena, Capacity - ByteCount);
-    return MakeString(Buffer, ByteCount);
+    return CreateString(Buffer, (u32)ByteCount);
 }
 
 // Returns null-terminated string
@@ -66,7 +67,7 @@ wchar_t *UTF16FromUTF8(arena *Arena, u8 *String8, int String8Length)
     Assert(String8Length > 0);
     
     int Capacity = (String8Length * 2) + 2;
-    wchar_t *Buffer = Allocate(Arena, Capacity, wchar_t);
+    wchar_t *Buffer = PushArray(Arena, Capacity, wchar_t);
     
     int CharacterCount = MultiByteToWideChar(CP_UTF8, 0, 
                                              (char *)String8, String8Length, 
@@ -75,45 +76,39 @@ wchar_t *UTF16FromUTF8(arena *Arena, u8 *String8, int String8Length)
     return Buffer;
 }
 
-// TODO: May be prefixed with \? stuff... test this
 string PlatformGetExecutablePath(arena *Arena)
 {
     temp_memory Scratch = GetScratch();
     
-    DWORD Capacity = 2048;
-    wchar_t *Buffer = Allocate(Scratch.Arena, Capacity, wchar_t);
+    string Result = {};
+    
+    DWORD Capacity = 1024;
+    wchar_t *Buffer = PushArray(Scratch.Arena, Capacity, wchar_t);
     
     u32 Size = 0;
     for (int Tries = 0; Tries < 4; ++Tries)
     {
+        // If succeeds then Size is the length NOT including the null terminator.
+        // If truncates then Size is the truncated length including the null terminator.
+        // If fails then Size is zero.
         Size = GetModuleFileNameW(NULL, Buffer, Capacity);
-        if (Size == Capacity && (GetLastError() == ERROR_INSUFFICIENT_BUFFER))
+        if (Size == Capacity)
         {
-            // String truncated to Size characters (including null terminator)
-            // Try again with larger Buffer
+            // Truncated (Size == NullTerminatedStringSize)
             Capacity *= 2;
-            Buffer = Allocate(Scratch.Arena, Capacity, wchar_t);
+            Buffer = PushArray(Scratch.Arena, Capacity, wchar_t);
         }
-        else
+        else if (Size == 0)
         {
-            // Error or Success
+            // Error 
             break;
         }
-    }
-    
-    // If succeeded then Size is the length of the Path (NOT including the null terminator). 
-    // If failed then Size is 0.
-    // Or if we failed 4 times Size will == Capacity (TODO: What happens if size is capacity but wan't truncated)?
-    // will GetLastError just not be set and we can use path.
-    
-    // From docs:
-    // "If the length of the path is less than the size that the nSize parameter specifies, the function succeeds and the path is returned as a null-terminated string."
-    // "And if exceeds then truncates..."
-    
-    string Result = {};
-    if (Size > 0)
-    {
-        Result = UTF8FromUTF16(Arena, Buffer, Size);
+        else if (Size < Capacity)
+        {
+            // Success (Size == NonNullTerminatedFileNameLength)
+            Result = UTF8FromUTF16(Arena, Buffer, Size);
+            break;
+        }
     }
     
     ReleaseScratch(Scratch);
@@ -121,15 +116,15 @@ string PlatformGetExecutablePath(arena *Arena)
     return Result;
 }
 
-bool PlatformFileExists(string FileName)
+bool PlatformFileExists(string FilePath)
 {
     // I think you need to prepend \\?\ to exceed 260 Characters
     // TODO: Test with a long path
     // This null terminates for us
     temp_memory Scratch = GetScratch();
     
-    wchar_t *FileName16 = UTF16FromUTF8(Scratch.Arena, FileName.Str, (int)FileName.Length);
-    DWORD Result = GetFileAttributesW(FileName16);
+    wchar_t *FilePath16 = UTF16FromUTF8(Scratch.Arena, FilePath.Str, (int)FilePath.Length);
+    DWORD Result = GetFileAttributesW(FilePath16);
     bool IsDirectory = Result & FILE_ATTRIBUTE_DIRECTORY;
     bool Exists = Result != INVALID_FILE_ATTRIBUTES; 
     
@@ -138,22 +133,22 @@ bool PlatformFileExists(string FileName)
     return Exists && !IsDirectory;
 }
 
-u64 PlatformGetFileSize(string FileName)
+u64 PlatformGetFileSize(string FilePath)
 {
     u64 Result = 0;
     
     temp_memory Scratch = GetScratch();
     
-    wchar_t *FileName16 = UTF16FromUTF8(Scratch.Arena, FileName.Str, (int)FileName.Length);
+    wchar_t *FilePath16 = UTF16FromUTF8(Scratch.Arena, FilePath.Str, (int)FilePath.Length);
     
-    HANDLE File = CreateFileW(FileName16, GENERIC_READ, FILE_SHARE_READ, NULL, 
+    HANDLE File = CreateFileW(FilePath16, GENERIC_READ, FILE_SHARE_READ, NULL, 
                               OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (File != INVALID_HANDLE_VALUE)
     {
         LARGE_INTEGER Size;
         if (GetFileSizeEx(File, &Size))
         {
-            Result = Size.QuadPart;
+            Result = (u64)Size.QuadPart;
         }
     }
     
@@ -162,25 +157,25 @@ u64 PlatformGetFileSize(string FileName)
     return Result;
 }
 
-platform_file_contents PlatformReadEntireFile(arena *Arena, string FileName)
+platform_file_contents PlatformReadEntireFile(arena *Arena, string FilePath)
 {
     platform_file_contents Result = {};
     
     temp_memory Scratch = GetScratch();
     
-    wchar_t *FileName16 = UTF16FromUTF8(Scratch.Arena, FileName.Str, (int)FileName.Length);
+    wchar_t *FilePath16 = UTF16FromUTF8(Scratch.Arena, FilePath.Str, (int)FilePath.Length);
     
-    HANDLE File = CreateFileW(FileName16, GENERIC_READ, FILE_SHARE_READ, NULL, 
+    HANDLE File = CreateFileW(FilePath16, GENERIC_READ, FILE_SHARE_READ, NULL, 
                               OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (File != INVALID_HANDLE_VALUE)
     {
         LARGE_INTEGER Size;
         if (GetFileSizeEx(File, &Size))
         {
-            u64 FileSize = Size.QuadPart;
+            u64 FileSize = (u64)Size.QuadPart;
             if (FileSize > 0)
             {
-                u8 *Contents = Allocate(Arena, FileSize, u8);
+                u8 *Contents = PushArray(Arena, FileSize, u8);
                 if (Contents)
                 {
                     u8 *Dest = Contents;
@@ -221,6 +216,61 @@ platform_file_contents PlatformReadEntireFile(arena *Arena, string FileName)
     return Result;
 }
 
+// Creates a file or replaces an existing file.
+bool PlatformWriteEntireFile(u64 Size, u8 *Contents, string FilePath)
+{
+    temp_memory Scratch = GetScratch();
+    
+    bool Success = false;
+    
+    wchar_t *FilePath16 = UTF16FromUTF8(Scratch.Arena, FilePath.Str, (int)FilePath.Length);
+    
+    HANDLE File = CreateFileW(FilePath16, GENERIC_WRITE, 0, NULL, 
+                              CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (File != INVALID_HANDLE_VALUE)
+    {
+        u8 *Source = Contents;
+        u64 BytesRemaining = Size;
+        while (BytesRemaining > 0)
+        {
+            DWORD ChunkSize = (DWORD)ClampTop(BytesRemaining, UINT32_MAX);
+            DWORD BytesWritten = 0;
+            if (WriteFile(File, Source, ChunkSize, &BytesWritten, 0))
+            {
+                BytesRemaining -= BytesWritten;
+                Source += BytesWritten;
+            }
+            else
+            {
+                break;
+            }
+        }
+        
+        if (BytesRemaining == 0)
+        {
+            Success = true;
+        }
+        
+        CloseHandle(File);
+    }
+    
+    ReleaseScratch(Scratch);
+    
+    return Success;
+}
+
+bool PlatformDeleteFile(string FilePath)
+{
+    temp_memory Scratch = GetScratch();
+    
+    wchar_t *FilePath16 = UTF16FromUTF8(Scratch.Arena, FilePath.Str, (int)FilePath.Length);
+    bool Success = (DeleteFileW(FilePath16) != 0);
+    
+    ReleaseScratch(Scratch);
+    
+    return Success;
+}
+
 void *PlatformMemoryReserve(u64 Size)
 {
     Assert(Size > 0);
@@ -246,15 +296,128 @@ void PlatformMemoryDecommit(void *Address, u64 Size)
     Assert(Address);
     Assert(Size > 0);
     // Does not fail if you try to decommit an uncommited page
-    VirtualFree(Address, Size, MEM_DECOMMIT);
+    BOOL Success = VirtualFree(Address, Size, MEM_DECOMMIT);
+    Assert(Success);
 }
 
 void PlatformMemoryFree(void *Address)
 {
     // Decommits all commited pages and releases reserved memory region
     Assert(Address);
-    VirtualFree(Address, 0, MEM_RELEASE);
+    BOOL Success = VirtualFree(Address, 0, MEM_RELEASE);
+    Assert(Success);
 }
+
+void PlatformMemoryGuard(void *Address, u64 Size)
+{
+    // Only for debug builds
+    Assert(Address);
+    
+    // Undefined behaviour 
+    u64 AddressInt = (u64)Address;
+    Assert((AddressInt & (4096 - 1)) == 0);
+    Assert((Size & (4096 - 1)) == 0);
+    
+    DWORD OldProtectFlags;
+    BOOL Success = VirtualProtect(Address, Size, PAGE_NOACCESS, &OldProtectFlags);
+    Assert(Success);
+}
+
+void PlatformMemoryRemoveGuard(void *Address, u64 Size)
+{
+    // Only for debug builds
+    Assert(Address);
+    
+    // Undefined behaviour 
+    u64 AddressInt = (u64)Address;
+    Assert((AddressInt & (4096 - 1)) == 0);
+    Assert((Size & (4096 - 1)) == 0);
+    
+    DWORD OldProtectFlags;
+    BOOL Success = VirtualProtect(Address, Size, PAGE_READWRITE, &OldProtectFlags);
+    Assert(Success);
+}
+
+struct test
+{
+    u8 A;
+    u8 B;
+    u16 D;
+    u8 C;
+};
+
+static_assert(sizeof(test) == 6, "size is ");
+static_assert(alignof(test) == 2, "align is ");
+
+struct test2
+{
+    u8 A;
+    u8 B;
+    u8 C;
+};
+
+static_assert(sizeof(test2) == 3, "size is ");
+static_assert(alignof(test2) == 1, "align is ");
+
+#pragma pack(push, 1)
+struct test3
+{
+    u16 A;
+    u16 B;
+    u8 C;
+};
+#pragma pack(pop)
+
+static_assert(sizeof(test3) == 5, "size is ");
+static_assert(alignof(test3) == 1, "align is ");
+
+void PageProtection(char *Buffer, DWORD ProtectionFlags)
+{
+    if (ProtectionFlags & PAGE_EXECUTE)            strcat_s(Buffer, 4096, "PAGE_EXECUTE|");
+    if (ProtectionFlags & PAGE_EXECUTE_READ)       strcat_s(Buffer, 4096, "PAGE_EXECUTE_READ|");
+    if (ProtectionFlags & PAGE_EXECUTE_READWRITE)  strcat_s(Buffer, 4096, "PAGE_EXECUTE_READWRITE|");
+    if (ProtectionFlags & PAGE_EXECUTE_WRITECOPY)  strcat_s(Buffer, 4096, "PAGE_EXECUTE_WRITECOPY|");
+    if (ProtectionFlags & PAGE_NOACCESS)           strcat_s(Buffer, 4096, "PAGE_NOACCESS|");
+    if (ProtectionFlags & PAGE_READONLY)           strcat_s(Buffer, 4096, "PAGE_READONLY|");
+    if (ProtectionFlags & PAGE_READWRITE)          strcat_s(Buffer, 4096, "PAGE_READWRITE|");
+    if (ProtectionFlags & PAGE_WRITECOPY)          strcat_s(Buffer, 4096, "PAGE_WRITECOPY|");
+    if (ProtectionFlags & PAGE_TARGETS_INVALID)    strcat_s(Buffer, 4096, "PAGE_TARGETS_INVALID|");
+    
+    if (ProtectionFlags & PAGE_GUARD)              strcat_s(Buffer, 4096, "PAGE_GUARD|");
+    if (ProtectionFlags & PAGE_NOCACHE)            strcat_s(Buffer, 4096, "PAGE_NOCACHE|");
+    if (ProtectionFlags & PAGE_WRITECOMBINE)       strcat_s(Buffer, 4096, "PAGE_WRITECOMBINE|");
+}
+
+void QueryPages(arena *Arena)
+{
+    for (u64 i = 0; i < Arena->Commit + 4096; i += 4096)
+    {
+        MEMORY_BASIC_INFORMATION Info = {};
+        SIZE_T Size = VirtualQuery(Arena->Base + i, &Info, sizeof(Info));
+        Assert(Size);
+        
+        char *State = "UNKNOWN";
+        if (Info.State == MEM_COMMIT) State = "MEM_COMMIT";
+        if (Info.State == MEM_FREE) State = "MEM_FREE";
+        if (Info.State == MEM_RESERVE) State = "MEM_RESERVE";
+        
+        char InitialProtection[4069] = {};
+        PageProtection(InitialProtection, Info.AllocationProtect); 
+        
+        char Protection[4069] = {};
+        PageProtection(Protection, Info.Protect); 
+        
+        printf("%p initial: %s, region size: %llu, state %s, protect: %s\n", 
+               Info.BaseAddress, 
+               InitialProtection, 
+               Info.RegionSize, State, 
+               Protection);
+    }
+    
+    printf("\n");
+}
+
+
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine, int nCmdShow)
 {
@@ -263,11 +426,128 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
     (void)pCmdLine;
     (void)nCmdShow;
     
+    Win32CreateConsole();
+    
+#if 0
+    {
+        arena *Arena = CreateArena(GB(1));
+        QueryPages(Arena);
+        u32 Count = 10000;
+        u32 *Array1 = PushArray(Arena, Count, u32);
+        QueryPages(Arena);
+        for (u32 i = 0; i < Count; ++i)
+        {
+            Array1[i] = i;
+        }
+        
+        u32 Load = Array1[Count];
+        Array1[Count] = 255;
+        
+        int x = 99;
+        FreeArena(Arena);
+    }
+#endif
+    
+    
+#if 0
+    {
+        arena *Arena = CreateArena(GB(1));
+        test *Test = PushStruct(Arena, test);
+        Test->A = 0;
+        Test->B = 1;
+        Test->D = 3;
+        Test->C = 2;
+        
+        test *After = Test + 1;
+        After->B = 2;
+        u8 Load = After->A;
+        
+        int x = 99;
+        FreeArena(Arena);
+    }
+#endif
+    
+#if 0    
+    {
+        arena *Arena = CreateArena(GB(1));
+        test *Test = PushArray(Arena, 2, test);
+        Test->A = 0;
+        Test->B = 1;
+        Test->D = 3;
+        Test->C = 2;
+        
+        Test = Test + 1;
+        Test->A = 0;
+        Test->B = 1;
+        Test->D = 3;
+        Test->C = 2;
+        
+        test *After = Test + 1;
+        After->B = 2;
+        u8 Load = After->A;
+        
+        int x = 99;
+        FreeArena(Arena);
+    }
+#endif
+    
+    {
+        arena *Arena = CreateArena(GB(1));
+        
+        QueryPages(Arena);
+        u32 *Array1 = PushArray(Arena, 100, u32);
+        for (u32 i = 0; i < 100; ++i)
+        {
+            Array1[i] = i;
+        }
+        
+        QueryPages(Arena);
+        u32 *Array2 = PushArray(Arena, 1000, u32);
+        for (u32 i = 0; i < 1000; ++i)
+        {
+            Array2[i] = i;
+        }
+        
+        QueryPages(Arena);
+        u32 *Array3 = PushArray(Arena, 10000, u32);
+        for (u32 i = 0; i < 10000; ++i)
+        {
+            Array3[i] = i;
+        }
+        
+        QueryPages(Arena);
+        PopSize(Arena, 40000);
+        
+        QueryPages(Arena);
+        u32 *Array4 = PushArray(Arena, 10000, u32);
+        for (u32 i = 0; i < 10000; ++i)
+        {
+            Array4[i] = i;
+        }
+        
+        QueryPages(Arena);
+        u64 *Array5 = PushArray(Arena, 100000, u64);
+        for (u32 i = 0; i < 10000; ++i)
+        {
+            Array5[i] = i;
+        }
+        
+        QueryPages(Arena);
+        PopToPosition(Arena, MB(900)); // SHould do nothing
+        
+        QueryPages(Arena);
+        PopSize(Arena, 500);
+        
+        QueryPages(Arena);
+        
+        FreeArena(Arena);
+    }
+    
     {
         arena *Arena = CreateArena(GB(300));
         
-        u32 *Array1 = Allocate(Arena, MB(30) / 4, u32);
-        u32 *Array2 = Allocate(Arena, MB(30) / 4, u32, NoClear());
+        u32 *Array1 = PushArray(Arena, MB(30) / 4, u32);
+        u32 *Array2 = PushArray(Arena, MB(30) / 4, u32, NoClear());
         
         for (u32 i = 0; i < 10000; ++i)
         {
@@ -290,16 +570,16 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
         
         PopToPosition(Arena, Pos);
         
-        u8 *Array3 = Allocate(Arena, MB(100), u8);
+        u8 *Array3 = PushArray(Arena, MB(100), u8);
         
         for (u32 i = 0; i < MB(100); ++i)
             Array3[i] = (u8)i;
         
         temp_memory TempMemory1 = BeginTempMemory(Arena);
-        u8 *Array4 = Allocate(Arena, 100, u8);
+        u8 *Array4 = PushArray(Arena, 100, u8);
         MemoryZero(100, Array4);
         temp_memory TempMemory2 = BeginTempMemory(Arena);
-        u8 *Array5 = Allocate(Arena, 100, u8);
+        u8 *Array5 = PushArray(Arena, 100, u8);
         MemoryZero(100, Array5);
         
         EndTempMemory(TempMemory1); // In wrong order
@@ -307,7 +587,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
         
         temp_memory Scratch = GetScratch();
         
-        u16 *Array6 = Allocate(Scratch.Arena, 10000, u16);
+        u16 *Array6 = PushArray(Scratch.Arena, 10000, u16);
         MemoryZero(10000 * 2, Array6);
         arena *Struct = PushStruct(Scratch.Arena, arena);
         Struct->Base = 0;
@@ -316,8 +596,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
         ReleaseScratch(Scratch);
         
         // Should this be allowed?
-        //u32 *ZeroByteAlloc = Allocate(Arena, 0, u32);
+        //u32 *ZeroByteAlloc = PushArray(Arena, 0, u32);
         //Assert(ZeroByteAlloc != 0);
+        
+        ClearArena(Arena);
+        
+        Assert(PushArray(Arena, MB(100), u8));
         
         FreeArena(Arena);
     }
@@ -346,7 +630,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
         
         for (u32 i = 0; i < 10; ++i)
         {
-            Assert(IsNumeric(StringNumbers[i]));
+            Assert(IsNumber(StringNumbers[i]));
         }
         
         u64 Index1 = StringFindChar(StringUpper, 'Y', 10);
@@ -355,10 +639,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
         u64 Index2 = StringFindChar(StringUpper, '7');
         Assert(Index2 == StringUpper.Length);
         
-        u64 Index3 = StringFindCharReverse(StringUpper, 'D');
+        u64 Index3 = StringFindLastChar(StringUpper, 'D');
         Assert(Index3 == 3);
         
-        u64 Index4 = StringFindCharReverse(StringLit(""), '6');
+        u64 Index4 = StringFindLastChar(StringLit(""), '6');
         Assert(Index4 == 0);
         
         Assert(StringContainsChar(StringLit("ABC"), 'B'));
@@ -383,12 +667,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
         string TestDotDotObj = StringLit("test..obj");
         string Test = StringLit("test");
         string Dot = StringLit(".");
-        StringRemoveExtension(&FileExe);
-        StringRemoveExtension(&TestDotTarGz);
-        StringRemoveExtension(&TestDotObjDot);
-        StringRemoveExtension(&TestDotDotObj);
-        StringRemoveExtension(&Test);
-        StringRemoveExtension(&Dot);
+        RemoveExtension(&FileExe);
+        RemoveExtension(&TestDotTarGz);
+        RemoveExtension(&TestDotObjDot);
+        RemoveExtension(&TestDotDotObj);
+        RemoveExtension(&Test);
+        RemoveExtension(&Dot);
         
         Assert(StringsAreEqual(FileExe, StringLit("file"))); 
         Assert(StringsAreEqual(TestDotTarGz, StringLit("test.tar"))); 
@@ -397,16 +681,27 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
         Assert(StringsAreEqual(Test, StringLit("test"))); 
         Assert(StringsAreEqual(Dot, StringLit(""))); 
         
-        Assert(StringsAreEqual(StringLit("file.exe"), StringFilenameFromPath(StringLit("c:/dev/test/file.exe")))); 
-        Assert(StringsAreEqual(StringLit("file.exe"), StringFilenameFromPath(StringLit("c://dev/test////file.exe")))); 
-        Assert(StringsAreEqual(StringLit("file.exe"), StringFilenameFromPath(StringLit("/c/dev/test/file.exe")))); 
-        Assert(StringsAreEqual(StringLit("file"), StringFilenameFromPath(StringLit("/c/dev/test/file")))); 
-        Assert(StringsAreEqual(StringLit("file"), StringFilenameFromPath(StringLit("/c/.dev/test //file")))); 
-        Assert(StringsAreEqual(StringLit(""), StringFilenameFromPath(StringLit("/c/dev/test/file/")))); 
-        Assert(StringsAreEqual(StringLit("file"), StringFilenameFromPath(StringLit("file")))); 
-        Assert(StringsAreEqual(StringLit(""), StringFilenameFromPath(StringLit("/")))); 
-        Assert(StringsAreEqual(StringLit("c"), StringFilenameFromPath(StringLit("/c")))); 
-        Assert(StringsAreEqual(StringLit("elmo.doc"), StringFilenameFromPath(StringLit("c:/abc\\def//hjkl\\\\sdfsdf/elmo.doc")))); 
+        Assert(StringsAreEqual(StringLit("file.exe"), FilenameFromPath(StringLit("c:/dev/test/file.exe")))); 
+        Assert(StringsAreEqual(StringLit("file.exe"), FilenameFromPath(StringLit("c://dev/test////file.exe")))); 
+        Assert(StringsAreEqual(StringLit("file.exe"), FilenameFromPath(StringLit("/c/dev/test/file.exe")))); 
+        Assert(StringsAreEqual(StringLit("file"), FilenameFromPath(StringLit("/c/dev/test/file")))); 
+        Assert(StringsAreEqual(StringLit("file"), FilenameFromPath(StringLit("/c/.dev/test //file")))); 
+        Assert(StringsAreEqual(StringLit(""), FilenameFromPath(StringLit("/c/dev/test/file/")))); 
+        Assert(StringsAreEqual(StringLit(""), FilenameFromPath(StringLit("file")))); 
+        Assert(StringsAreEqual(StringLit(""), FilenameFromPath(StringLit("/")))); 
+        Assert(StringsAreEqual(StringLit("c"), FilenameFromPath(StringLit("/c")))); 
+        Assert(StringsAreEqual(StringLit("elmo.doc"), FilenameFromPath(StringLit("c:/abc\\def//hjkl\\\\sdfsdf/elmo.doc")))); 
+        
+        Assert(StringsAreEqual(StringLit("c:/dev/test/"), DirectoryFromPath(StringLit("c:/dev/test/file.exe")))); 
+        Assert(StringsAreEqual(StringLit("c://dev/test////"), DirectoryFromPath(StringLit("c://dev/test////file.exe")))); 
+        Assert(StringsAreEqual(StringLit("/c/dev/test/"), DirectoryFromPath(StringLit("/c/dev/test/file.exe")))); 
+        Assert(StringsAreEqual(StringLit("/c/dev/test/"), DirectoryFromPath(StringLit("/c/dev/test/file")))); 
+        Assert(StringsAreEqual(StringLit("/c/.dev/test //"), DirectoryFromPath(StringLit("/c/.dev/test //file")))); 
+        Assert(StringsAreEqual(StringLit("/c/dev/test/file/"), DirectoryFromPath(StringLit("/c/dev/test/file/")))); 
+        Assert(StringsAreEqual(StringLit(""), DirectoryFromPath(StringLit("file")))); 
+        Assert(StringsAreEqual(StringLit("/"), DirectoryFromPath(StringLit("/")))); 
+        Assert(StringsAreEqual(StringLit("/"), DirectoryFromPath(StringLit("/c")))); 
+        Assert(StringsAreEqual(StringLit("c:/abc\\def//hjkl\\\\sdfsdf/"), DirectoryFromPath(StringLit("c:/abc\\def//hjkl\\\\sdfsdf/elmo.doc")))); 
         
         temp_memory Scratch = GetScratch();
         
@@ -423,48 +718,67 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
         FreeArena(Arena);
     }
     
-    arena *Arena = CreateArena(GB(10));
-    
-    string String8 = UTF8FromUTF16(Arena, (wchar_t *)L"Hellow", 6);
-    wchar_t *String16 = UTF16FromUTF8(Arena, (u8 *)"Hellow", 6);
-    (void)String16;
-    
-    string ExePath = PlatformGetExecutablePath(Arena);
-    Assert(PlatformFileExists(StringLit("c:/dev/base/build/test.md")));
-    Assert(PlatformFileExists(StringLit("c:/dev/base/build/base_test.exe")));
-    Assert(PlatformFileExists(StringLit("c:\\dev\\base\\build\\base_test.exe")));
-    Assert(PlatformFileExists(StringLit("c:\\dev\\base\\build\\BASE_TEST.EXE")));
-    Assert(!PlatformFileExists(StringLit("c:\\dev\\base\\build\\")));
-    Assert(!PlatformFileExists(StringLit("c:\\dev\\base\\build")));
-    Assert(!PlatformFileExists(StringLit("c:\\fake\\fakey")));
-    
-    
-    Assert(PlatformGetFileSize(StringLit("c:\\dev\\base\\build\\test.md")) == 815);
-    
-    platform_file_contents File = PlatformReadEntireFile(Arena, StringLit("test.md"));
-    
-#if 0
-    u64 TotalSize = GB(5);
-    u64 ChunkSize = TotalSize / 32;
-    Assert(TotalSize % 32 == 0);
-    u32 WriteCount = 32;
-    u8 *Chunk = Allocate(Arena, ChunkSize, u8);
-    
-    FILE *fp = fopen("large.big", "wb");
-    for (u32 i = 0; i < WriteCount; ++i)
     {
-        fwrite(Chunk, ChunkSize, 1, fp);
-    }
-    fclose(fp);
-    
-    PopSize(Arena, ChunkSize);
-    
-    platform_file_contents LargeFile = PlatformReadEntireFile(Arena, StringLit("large.big"));
-    
-    DeleteFile("large.big");
+        arena *Arena = CreateArena(GB(10));
+        
+        string String8 = UTF8FromUTF16(Arena, (wchar_t *)L"Hellow", 6);
+        wchar_t *String16 = UTF16FromUTF8(Arena, (u8 *)"Hellow", 6);
+        (void)String16;
+        
+        string ExePath = PlatformGetExecutablePath(Arena);
+        Assert(StringsAreEqual(ExePath, StringLit("c:\\dev\\projects\\base\\build\\base_test.exe")));
+        
+        
+        
+        Assert(PlatformFileExists(StringLit("c:/dev/projects/base/build/test.md")));
+        Assert(PlatformFileExists(StringLit("c:/dev/projects/base/build/base_test.exe")));
+        Assert(PlatformFileExists(StringLit("c:\\dev\\projects\\base\\build\\base_test.exe")));
+        Assert(PlatformFileExists(StringLit("c:\\dev\\projects\\base\\build\\BASE_TEST.EXE")));
+        Assert(!PlatformFileExists(StringLit("c:\\dev\\projects\\base\\build\\")));
+        Assert(!PlatformFileExists(StringLit("c:\\dev\\projects\\base\\build")));
+        Assert(!PlatformFileExists(StringLit("c:\\fake\\fakey")));
+        
+        
+        Assert(PlatformGetFileSize(StringLit("c:\\dev\\projects\\base\\build\\test.md")) == 815);
+        
+        platform_file_contents File = PlatformReadEntireFile(Arena, StringLit("test.md"));
+        
+#if 0
+        u64 TotalSize = GB(5);
+        u64 ChunkSize = TotalSize / 32;
+        Assert(TotalSize % 32 == 0);
+        u32 WriteCount = 32;
+        u8 *Chunk = PushArray(Arena, ChunkSize, u8);
+        
+        FILE *fp = fopen("large.big", "wb");
+        for (u32 i = 0; i < WriteCount; ++i)
+        {
+            fwrite(Chunk, ChunkSize, 1, fp);
+        }
+        fclose(fp);
+        
+        PopSize(Arena, ChunkSize);
+        
+        platform_file_contents LargeFile = PlatformReadEntireFile(Arena, StringLit("large.big"));
+        
+        DeleteFile("large.big");
 #endif
+        
+        u64 Data[] = { 0x3234234, 0x23423423, 0x0349538450, 0x93213, 0x34882349 };
+        Assert(PlatformWriteEntireFile(sizeof(Data), (u8 *)Data,
+                                       StringLit("c:/dev/projects/base/build/writefile.test")));
+        
+        platform_file_contents RoundTripFile = PlatformReadEntireFile(Arena, StringLit("c:/dev/projects/base/build/writefile.test"));
+        Assert(RoundTripFile.Size == sizeof(Data));
+        Assert(memcmp(Data, RoundTripFile.Contents, sizeof(Data)) == 0);
+        
+        Assert(PlatformDeleteFile(StringLit("c:/dev/projects/base/build/writefile.test")));
+        
+        FreeArena(Arena);
+    }
     
-    FreeArena(Arena);
+    //v2 A = v2{0.1f, 1.0f};
+    //vec2 B = vec2{0.1f, 1.0f};
     
     return 0;
 }

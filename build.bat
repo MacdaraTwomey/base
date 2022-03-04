@@ -11,7 +11,7 @@ pushd build
 
 ::c++ standard flag
 
-cl %SourceFiles% %IncludeDirs% -DBASE_DEBUG=1 -W4 -INCREMENTAL:NO -FC -EHs- -nologo -Zi -link %LinkedLibraries% -out:base_test.exe 
+cl %SourceFiles% %IncludeDirs% -DBASE_DEBUG=1 -W4 -std:c++14 -INCREMENTAL:NO -FC -EHs- -nologo -Zi -link %LinkedLibraries% -out:base_test.exe 
 
 
 popd

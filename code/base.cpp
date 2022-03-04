@@ -21,7 +21,8 @@ static arena *GlobalScratchArena_ = nullptr;
 
 #define ARENA_HEADER_SIZE 64
 #define PAGE_SIZE 4096
-#define COMMIT_CHUNK_SIZE MB(32)
+//#define COMMIT_CHUNK_SIZE MB(32)
+#define COMMIT_CHUNK_SIZE (PAGE_SIZE * 8) // TODO
 
 static_assert(sizeof(arena) <= ARENA_HEADER_SIZE, "Must be able to fit arena struct into start of arena memory");
 
@@ -43,6 +44,13 @@ void MemoryZero(u64 Size, void *Memory)
     memset(Memory, 0, Size);
 }
 
+bool MemoryIsEqual(u64 Size, void *A, void *B)
+{
+    Assert(A != nullptr);
+    Assert(B != nullptr);
+    return memcmp(A, B, Size) == 0;
+}
+
 bool IsPowerOfTwo(u64 x) 
 {
     return (x & (x-1)) == 0;
@@ -56,6 +64,13 @@ u64 AlignUp(u64 Value, u64 Align)
     // Then round off what we don't need by applying mask
     u64 AlignMask = Align - 1;
     return (Value + AlignMask) & ~AlignMask;
+}
+
+u64 AlignDown(u64 Value, u64 Align)
+{
+    Assert(IsPowerOfTwo(Align));
+    
+    return Value & ~(Align - 1);
 }
 
 arena *CreateArena(u64 ReserveSize)
@@ -98,12 +113,81 @@ void FreeArena(arena *Arena)
     PlatformMemoryFree(Arena->Base);
 }
 
-void *PushSize_(arena *Arena, u64 Size, u32 Alignment, u8 ArenaPushFlags)
+void *PushSize_(arena *Arena, u64 Size, u32 Alignment, u32 ArenaPushFlags)
 {
     // It is not really necessary to properly align allocations on modern x64 processors (unless you are doing SIMD, or possibly on ARM), 
     // It may be undefined behaviour to access an unaligned type, but we are already ignoring strict aliasing.
     
     Assert(Size > 0);
+    Assert(Alignment > 0);
+    Assert(IsPowerOfTwo(Alignment));
+    
+    Assert(Arena->Pos >= ARENA_HEADER_SIZE);
+    Assert(Arena->Pos <= Arena->Commit);
+    Assert(Arena->Commit <= Arena->Reserve);
+    Assert((Arena->Commit & (PAGE_SIZE - 1)) == 0);
+    
+    u8 *Result = nullptr;
+    
+    u64 AllocStart = AlignUp(Arena->Pos, Alignment);
+    u64 AllocEnd   = AllocStart + Size;
+    
+    u64 GuardStart = AlignUp(AllocEnd, PAGE_SIZE); 
+    u64 GuardEnd   = GuardStart + PAGE_SIZE; 
+    
+    u64 NewPos = GuardEnd;
+    
+    if (NewPos < Arena->Reserve)
+    {
+        if (NewPos > Arena->Commit)
+        {
+            u64 TotalCommitSize = AlignUp(NewPos, COMMIT_CHUNK_SIZE);
+            u64 NewCommit = ClampTop(TotalCommitSize, Arena->Reserve);
+            u64 NewCommitSize = NewCommit - Arena->Commit;
+            if (PlatformMemoryCommit(Arena->Base + Arena->Commit, NewCommitSize))
+            {
+                Arena->Commit = NewCommit;
+                Assert(Arena->Commit % PAGE_SIZE == 0);
+            }
+        }
+        
+        if (NewPos <= Arena->Commit)
+        {
+            // The only cases where Offset is not aligned to the requested alignment is when 
+            // the passed size is not a multiple of the alignement. This should only occur where
+            // push size is called directly, as allocated objects will have a size that is a multiple
+            // of their alignment.
+            u64 BytesToPageBoundary = PAGE_SIZE - (AllocEnd & (PAGE_SIZE - 1));
+            AllocStart += BytesToPageBoundary;
+            AllocStart = AllocStart & ~((u64)Alignment - 1);
+            
+            Result = Arena->Base + AllocStart;
+            Arena->Pos = NewPos;
+            
+            PlatformMemoryGuard(Arena->Base + GuardStart, PAGE_SIZE);
+            
+            if (ArenaPushFlags & ArenaPushFlags_ClearToZero)
+            {
+                MemoryZero(Size, Result);
+            }
+        }
+    }
+    
+    Assert(Result);
+    
+    return Result;
+}
+
+
+#if 0
+void *PushSize_(arena *Arena, u64 Size, u32 Alignment, u32 ArenaPushFlags)
+{
+    // It is not really necessary to properly align allocations on modern x64 processors (unless you are doing SIMD, or possibly on ARM), 
+    // It may be undefined behaviour to access an unaligned type, but we are already ignoring strict aliasing.
+    
+    Assert(Size > 0);
+    Assert(Alignment > 0);
+    Assert(IsPowerOfTwo(Alignment));
     
     u8 *Result = nullptr;
     u64 AlignedPos = AlignUp(Arena->Pos, Alignment);
@@ -117,10 +201,10 @@ void *PushSize_(arena *Arena, u64 Size, u32 Alignment, u8 ArenaPushFlags)
             u64 NewCommitSize = NewCommit - Arena->Commit;
             if (PlatformMemoryCommit(Arena->Base + Arena->Commit, NewCommitSize))
             {
-                // Unfortunately we still need to zero the memory that is before the newly commited memory, otherwise we would rely on the platform commit and disable the ClearToZero zero flag.
                 Arena->Commit = NewCommit;
                 Assert(Arena->Commit % PAGE_SIZE == 0);
             }
+            
         }
         
         if (NewPos <= Arena->Commit)
@@ -140,6 +224,7 @@ void *PushSize_(arena *Arena, u64 Size, u32 Alignment, u8 ArenaPushFlags)
     
     return Result;
 }
+#endif
 
 void *PushCopy_(arena *Arena, void *Source, u64 Size, u32 Alignment)
 {
@@ -150,6 +235,11 @@ void *PushCopy_(arena *Arena, void *Source, u64 Size, u32 Alignment)
 
 void PopToPosition(arena *Arena, u64 Position)
 {
+    Assert(Arena->Pos >= ARENA_HEADER_SIZE);
+    Assert(Arena->Pos <= Arena->Commit);
+    Assert(Arena->Commit <= Arena->Reserve);
+    Assert((Arena->Commit & (PAGE_SIZE - 1)) == 0);
+    
     // Prevent popping arena struct at start of allocated memory
     // or if the position is above the current arena pos.
     Assert(Position >= ARENA_HEADER_SIZE);
@@ -157,13 +247,23 @@ void PopToPosition(arena *Arena, u64 Position)
     u64 NewPos = Clamp(Position, (u64)ARENA_HEADER_SIZE, Arena->Pos);
     
     // Ensure that there is at most a commit chunk free
-    if (NewPos + COMMIT_CHUNK_SIZE < Arena->Commit)
+    u64 TestCommit = AlignUp(NewPos + COMMIT_CHUNK_SIZE, PAGE_SIZE);
+    if (TestCommit < Arena->Commit)
     {
-        u64 NewCommit = AlignUp(Arena->Commit - (NewPos + COMMIT_CHUNK_SIZE), PAGE_SIZE);
+        u64 NewCommit = TestCommit;
         u64 DecommitSize = Arena->Commit - NewCommit;
         PlatformMemoryDecommit(Arena->Base + NewCommit, DecommitSize);
         Arena->Commit = NewCommit;
     }
+    
+    // TODO: What happens if Pos == NewPos, we try to virtualprotect zero bytes
+    
+    Assert(ClampTop(Arena->Pos, Arena->Commit) >= NewPos);
+    
+    u64 RemoveGuardStart = NewPos & (PAGE_SIZE - 1); // Round down to start of page
+    u64 RemoveGuardEnd   = AlignUp(ClampTop(Arena->Pos, Arena->Commit), PAGE_SIZE); // Round Upto start of page
+    u64 RemoveGuardSize  = RemoveGuardEnd - RemoveGuardStart;
+    PlatformMemoryRemoveGuard(Arena->Base + RemoveGuardStart, RemoveGuardSize);
     
     Arena->Pos = NewPos;
 }
@@ -172,6 +272,12 @@ void PopSize(arena *Arena, u64 Size)
 {
     Assert(Arena->Pos > Size);
     PopToPosition(Arena, Arena->Pos - Size);
+}
+
+// TODO: Is this useful?
+void ClearArena(arena *Arena)
+{
+    PopToPosition(Arena, ARENA_HEADER_SIZE);
 }
 
 temp_memory BeginTempMemory(arena *Arena)
@@ -235,7 +341,7 @@ u64 StringLength(u8 *CString)
     return Length;
 }
 
-string MakeString(u8 *CString)
+string CreateString(u8 *CString)
 {
     string Result;
     Result.Str = CString;
@@ -243,7 +349,7 @@ string MakeString(u8 *CString)
     return Result;
 }
 
-string MakeString(u8 *StringData, u64 Length)
+string CreateString(u8 *StringData, u64 Length)
 {
     string Result;
     Result.Str = StringData;
@@ -262,7 +368,7 @@ u8 *PushCString(arena *Arena, u8 *String)
 string PushString(arena *Arena, string String)
 {
     u8 *StringData = (u8 *)PushCopy_(Arena, String.Str, String.Length, 1);
-    return MakeString(StringData, String.Length);
+    return CreateString(StringData, String.Length);
 }
 
 void BaseAssertPrint_(const char *Format, ...)
@@ -279,7 +385,7 @@ string PushFormatStringArgs(arena *Arena, char *Format, va_list Args)
 {
     u64 Length = 0;
     u64 Capacity = 1024;
-    u8 *Buffer = Allocate(Arena, Capacity, u8, NoClear());
+    u8 *Buffer = PushArray(Arena, Capacity, u8, NoClear());
     
     // We have to copy the va_list because we may call vsnprintf twice
     va_list ArgsCopy;
@@ -292,16 +398,16 @@ string PushFormatStringArgs(arena *Arena, char *Format, va_list Args)
         Length = 0;
         Assert(0);
     }
-    else if (RequiredCharCount >= Capacity)
+    else if ((u64)RequiredCharCount >= Capacity)
     {
-        // The string was truncated.
+        // Truncated
         // Returns the number of chars that would have been written (not including the null terminator).
         // If RequiredCharCount == StringLength (not including null terminator) then the last char was not 
         // written as a null terminator must be written instead.
         
         PopSize(Arena, Capacity);
-        u64 NewCapacity = RequiredCharCount + 1;
-        Buffer = Allocate(Arena, NewCapacity, u8);
+        u64 NewCapacity = (u64)RequiredCharCount + 1;
+        Buffer = PushArray(Arena, NewCapacity, u8);
         
         int WrittenCharCount = vsnprintf((char *)Buffer, NewCapacity, Format, ArgsCopy);
         if (WrittenCharCount < 0)
@@ -312,17 +418,18 @@ string PushFormatStringArgs(arena *Arena, char *Format, va_list Args)
         else
         {
             PopSize(Arena, NewCapacity - WrittenCharCount); // TODO: Is it necessary to pop one byte?
-            Length = WrittenCharCount;
+            Length = (u64)WrittenCharCount;
         }
     }
     else
     {
-        Length = RequiredCharCount;
+        // Success
+        Length = (u64)RequiredCharCount;
     }
     
     va_end (ArgsCopy);
     
-    return MakeString(Buffer, Length);
+    return CreateString(Buffer, Length);
 }
 
 
@@ -362,14 +469,14 @@ bool IsAlpha(u8 c)
     return IsLower(c) || IsUpper(c);
 }
 
-bool IsNumeric(u8 c)
+bool IsNumber(u8 c)
 {
     return (('0' <= c) && (c <= '9'));
 }
 
 bool IsAlphaNumeric(u8 c)
 {
-    return IsAlpha(c) || IsNumeric(c);
+    return IsAlpha(c) || IsNumber(c);
 }
 
 bool IsWhitespace(u8 c)
@@ -377,14 +484,19 @@ bool IsWhitespace(u8 c)
     return (c == ' ' || c == '\r' || c == '\n' || c == '\t' || c == '\f' || c == '\v');
 }
 
+bool IsSlash(u8 c)
+{
+    return (c == '\\' || c == '/');
+}
+
 u8 ToUpper(u8 c)
 {
-    return IsLower(c) ? c - 32 : c;
+    return IsLower(c) ? c - 32u : c;
 }
 
 u8 ToLower(u8 c)
 {
-    return IsUpper(c) ? c + 32 : c;
+    return IsUpper(c) ? c + 32u : c;
 }
 
 void StringToLower(string *String)
@@ -460,7 +572,7 @@ u64 StringFindChar(string String, u8 Char, u32 Offset)
     return Position;
 }
 
-u64 StringFindCharReverse(string String, u8 Char)
+u64 StringFindLastChar(string String, u8 Char)
 {
     u64 Position = String.Length;
     for (u64 i = String.Length - 1; i != static_cast<u64>(-1); --i)
@@ -545,17 +657,12 @@ bool StringContainsSubstr(string String, string Substr)
     return ContainsSubstr;
 }
 
-bool CharIsSlash(u8 c)
-{
-    return (c == '\\' || c == '/');
-}
-
 u64 StringFindLastSlash(string Path)
 {
     u64 Position = Path.Length;
     for (u64 i = Path.Length - 1; i != static_cast<u64>(-1); --i)
     {
-        if (CharIsSlash(Path.Str[i]))
+        if (IsSlash(Path.Str[i]))
         {
             Position = i;
             break;
@@ -565,25 +672,36 @@ u64 StringFindLastSlash(string Path)
     return Position;
 }
 
-void StringRemoveExtension(string *File)
+void RemoveExtension(string *File)
 {
     // Files can have multiple dots, and only last is the real extension.
     
     // If no dot is found Length stays the same
-    u64 DotPosition = StringFindCharReverse(*File, '.');
+    u64 DotPosition = StringFindLastChar(*File, '.');
     File->Length = DotPosition;
 }
 
-string StringFilenameFromPath(string Path)
+// If Path has no slashes (it is not an absolute path) then a zero length string is returned
+string FilenameFromPath(string Path)
 {
     u64 LastSlash = StringFindLastSlash(Path);
-    
+    StringSkip(&Path, LastSlash + 1);
+    return Path;
+}
+
+// If Path has no slashes then then a zero length string is returned
+// Includes slash after directory
+string DirectoryFromPath(string Path)
+{
+    // /abc/dev/file.exe
+    string Directory = {};
+    u64 LastSlash = StringFindLastSlash(Path);
     if (LastSlash < Path.Length)
     {
-        StringSkip(&Path, LastSlash + 1);
+        Directory = StringGetPrefix(Path, LastSlash + 1);
     }
     
-    return Path;
+    return Directory;
 }
 
 string_builder CreateStringBuilder()
@@ -597,7 +715,7 @@ string_builder CreateStringBuilder()
 
 void string_builder::Append(arena *Arena, string String)
 {
-    string_node *Node = PushStruct(Arena, string_node, 1);
+    string_node *Node = PushStruct(Arena, string_node);
     Node->String = PushString(Arena, String);
     Node->Next = nullptr;
     
@@ -616,12 +734,12 @@ void string_builder::Append(arena *Arena, string String)
 
 void string_builder::Append(arena *Arena, char *String)
 {
-    Append(Arena, MakeString((u8 *)String));
+    Append(Arena, CreateString((u8 *)String));
 }
 
 string string_builder::GetString(arena *Arena)
 {
-    u8 *StringMemory = Allocate(Arena, Length, u8);
+    u8 *StringMemory = PushArray(Arena, Length, u8);
     
     u64 CopiedLength = 0;
     for (string_node *Node = Head; Node != nullptr; Node = Node->Next)

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdarg.h>
 #include <stdint.h>
 
 ///////////////////////////////////////////////////////////////////////
@@ -109,7 +110,6 @@ constexpr const T& Clamp(const T& Value, const T& Low, const T& High)
     return (Value < Low) ? Low : (High < Value) ? High : Value;
 }
 
-// TODO: Do warnings catch signed unsigned comparison?
 #define Minimum(a, b) ((a) < (b) ? (a) : (b))
 #define Maximum(a, b) ((a) > (b) ? (a) : (b))
 //#define Clamp(Value, Low, High) (((Value) < (Low)) ? (Low) : ((High) < (Value)) ? (High) : (Value))
@@ -148,6 +148,8 @@ typedef int8_t   b8;
 typedef float    f32;
 typedef double   f64;
 
+#define U32_MAX 
+
 static_assert(sizeof(u8)  == 1, "");
 static_assert(sizeof(u16) == 2, "");
 static_assert(sizeof(u32) == 4, "");
@@ -180,35 +182,40 @@ struct temp_memory
     u64 StartPos;
 };
 
-enum arena_push_flags : u8
+enum arena_push_flags : u32
 {
     ArenaPushFlags_None = 0,
     ArenaPushFlags_ClearToZero = 1,
 };
 
-arena_push_flags DefaultArenaPushFlags()
+u32 ClearToZero()
 {
-    arena_push_flags Flags = ArenaPushFlags_ClearToZero;
+    u32 Flags = ArenaPushFlags_ClearToZero;
     return Flags;
 }
 
-arena_push_flags NoClear()
+u32 NoClear()
 {
-    arena_push_flags Flags = ArenaPushFlags_None;
+    u32 Flags = ArenaPushFlags_None;
     return Flags;
 }
 
 void        MemoryCopy(u64 Size, void *Source, void *Dest);
 void        MemoryCopyOverlapped(u64 Size, void *Source, void *Dest);
 void        MemoryZero(u64 Size, void *Memory);
+bool        MemoryIsEqual(u64 Size, void *A, void *B);
+
+bool        IsPowerOfTwo(u64 x);
+u64         AlignUp(u64 Value, u64 Align);
 
 arena *     CreateArena(u64 ReserveSize);
 void        FreeArena(arena *Arena);
 
-void *      PushSize_(arena *Arena, u64 Size, u32 Alignment, u8 ArenaPushFlags = DefaultArenaPushFlags());
+void *      PushSize_(arena *Arena, u64 Size, u32 Alignment, u32 ArenaPushFlags = ClearToZero());
 void *      PushCopy_(arena *Arena, void *Source, u64 Size, u32 Alignment); 
 void        PopToPosition(arena *Arena, u64 Pos);
 void        PopSize(arena *Arena, u64 Size);
+void        ClearArena(arena *Arena);
 
 temp_memory BeginTempMemory(arena *Arena);
 void        EndTempMemory(temp_memory TempMemory);
@@ -217,29 +224,13 @@ temp_memory GetScratch();
 void        ReleaseScratch(temp_memory ScratchMemory);
 
 
-// May need to write ##__VA_ARGS__ to remove comma that is placed if varargs is empty
-#define Allocate(Arena, Count, Type, ...) (Type *)PushSize_((Arena), (Count)*sizeof(Type), alignof(Type),  ##__VA_ARGS__)
+// ## __VA_ARGS is an extension on gcc and clang, and the MSVC preprocessor will eat trailing commas when 
+// VA_ARGS is empty. 
+#define PushArray(Arena, Count, Type, ...) (Type *)PushSize_((Arena), (Count)*sizeof(Type), alignof(Type), ##__VA_ARGS__)
 
-#define PushStruct(Arena, Type, ...) (Type *)PushSize_((Arena), sizeof(Type), alignof(Type),  __VA_ARGS__)
+#define PushStruct(Arena, Type, ...) (Type *)PushSize_((Arena), sizeof(Type), alignof(Type) ##__VA_ARGS__)
 
 #define PushCopy(Arena, Source, Count, Type) (Type *)PushCopy_((Arena), (void *)(Source), (Count)*sizeof(Type), alignof(Type))
-
-///////////////////////////////////////////////////////////////////////
-// Ring Buffer
-//
-
-struct ring_buffer
-{
-    //   r   w
-    // | 0123   |
-    u8 *Memory;
-    // These need to be u64 with the current implementation.
-    // If we want to the to be u32 then the Capacity must be a power of two.
-    u64 Read;   // Read % Capacity indexes the first byte availble for reading
-    u64 Write;  // Write % Capacity indexes the first byte free for writing (one past the last byte for reading)
-    u64 Capacity; 
-    void *Handle;
-};
 
 ///////////////////////////////////////////////////////////////////////
 // String
@@ -252,12 +243,12 @@ struct string
     
     const u8 &operator[](size_t Index) const
     {
-        Assert(Index >= 0 && Index < Length);
+        Assert(Index < Length);
         return Str[Index];
     }
     u8 &operator[](size_t Index)
     {
-        Assert(Index >= 0 && Index < Length);
+        Assert(Index < Length);
         return Str[Index];
     }
 };
@@ -281,11 +272,11 @@ struct string_builder
 
 #define StringLit(lit) string{(u8 *)(lit), sizeof(lit) - 1} // Null terminator not included in Length
 
-string MakeString(u8 *CString);
-string MakeString(u8 *StringData, u64 Length);
-u8 *   PushCString(arena *Arena, u8 *String);
-string PushString(arena *Arena, string String);
+string CreateString(u8 *CString);
+string CreateString(u8 *StringData, u64 Length);
 
+string PushString(arena *Arena, string String);
+u8 *   PushCString(arena *Arena, u8 *String);
 string PushFormatStringArgs(arena *Arena, char *Format, va_list Args);
 string PushFormatString(arena *Arena, char *Format, ...);
 
@@ -294,31 +285,151 @@ u8     StringGetChar(string String, u64 Index);
 bool   IsUpper(u8 c);
 bool   IsLower(u8 c);
 bool   IsAlpha(u8 c);
-bool   IsNumeric(u8 c);
+bool   IsNumber(u8 c);
 bool   IsAlphaNumeric(u8 c);
 bool   IsWhitespace(u8 c);
+bool   IsSlash(u8 c);
 u8     ToUpper(u8 c);
 u8     ToLower(u8 c);
-bool   CharIsSlash(u8 c);
+
+string StringGetPrefix(string String, u64 N);
+string StringGetSuffix(string String, u64 N);
 
 void   StringToLower(string *String);
 void   StringToUpper(string *String);
 void   StringSkip(string *String, u64 N);
 void   StringChop(string *String, u64 N);
 
-string StringGetPrefix(string String, u64 N);
-string StringGetSuffix(string String, u64 N);
-
 u64    StringCountOccurence(string String, u8 Char);
 u64    StringFindChar(string String, u8 Char, u32 Offset=0);
-u64    StringFindCharReverse(string String, u8 Char);
+u64    StringFindLastChar(string String, u8 Char);
 bool   StringContainsChar(string String, u8 Char);
 bool   StringsAreEqual(string A, string B);
 bool   StringsAreEqualCaseInsensitive(string a, string b);
 bool   StringContainsSubstr(string String, string Substr);
 
-u64    StringFindLastSlash(string Path);
-void   StringRemoveExtension(string *File);
-string StringFilenameFromPath(string Path);
+u64    FindLastSlash(string Path);
+void   RemoveExtension(string *File);
+string FilenameFromPath(string Path);
+string DirectoryFromPath(string Path);
 
 string_builder CreateStringBuilder();
+
+///////////////////////////////////////////////////////////////////////
+// Math
+//
+
+#include <math.h>
+#include <float.h>
+
+#define R32Max FLT_MAX
+#define R32Min -FLT_MAX
+#define Pi32 3.14159265359f
+#define Tau32 6.28318530717958647692f
+
+#if 0
+union v2
+{
+    struct
+    {
+        f32 x, y;
+    };
+    struct
+    {
+        f32 u, v;
+    };
+    struct
+    {
+        f32 Width, Height;
+    };
+    f32 E[2];
+};
+
+
+union v3
+{
+    struct
+    {
+        f32 x, y, z;
+    };
+    struct
+    {
+        f32 r, g, b;
+    };
+    struct
+    {
+        v2 xy;
+        f32 Ignored0_;
+    };
+    struct
+    {
+        f32 Ignored1_;
+        v2 yz;
+    };
+    f32 E[3];
+};
+
+union v4
+{
+    struct
+    {
+        union
+        {
+            v3 xyz;
+            struct
+            {
+                f32 x, y, z;
+            };
+        };
+        
+        f32 w;
+    };
+    struct
+    {
+        union
+        {
+            v3 rgb;
+            struct
+            {
+                f32 r, g, b;
+            };
+        };
+        
+        f32 a;
+    };
+    struct
+    {
+        v2 xy;
+        f32 Ignored0_;
+        f32 Ignored1_;
+    };
+    struct
+    {
+        f32 Ignored2_;
+        v2 yz;
+        f32 Ignored3_;
+    };
+    struct
+    {
+        f32 Ignored4_;
+        f32 Ignored5_;
+        v2 zw;
+    };
+    f32 E[4];
+};
+
+// This is OK as anonymous unions are allowed
+struct vec2
+{
+    union
+    {
+        float x, left, u;
+    };
+    union
+    {
+        float y, right, v;
+    };
+    
+};
+
+#endif
