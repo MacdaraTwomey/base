@@ -1,7 +1,8 @@
 
-#include <stdarg.h>
+#include <stdarg.h> // va_list, va_copy, va_start, va_end
 #include <stdio.h> // vsnprintf,
 #include <string.h> // memset, memcpy, memmove
+#include <math.h>
 
 #include "platform.h"
 #include "base.h"
@@ -132,10 +133,13 @@ void *PushSize_(arena *Arena, u64 Size, u32 Alignment, u32 ArenaPushFlags)
     u64 AllocStart = AlignUp(Arena->Pos, Alignment);
     u64 AllocEnd   = AllocStart + Size;
     
+    u64 NewPos = AllocEnd;
+    
+#if ARENA_GUARD_PAGES
     u64 GuardStart = AlignUp(AllocEnd, PAGE_SIZE); 
     u64 GuardEnd   = GuardStart + PAGE_SIZE; 
-    
-    u64 NewPos = GuardEnd;
+    NewPos = GuardEnd;
+#endif
     
     if (NewPos < Arena->Reserve)
     {
@@ -147,29 +151,31 @@ void *PushSize_(arena *Arena, u64 Size, u32 Alignment, u32 ArenaPushFlags)
             if (PlatformMemoryCommit(Arena->Base + Arena->Commit, NewCommitSize))
             {
                 Arena->Commit = NewCommit;
-                Assert(Arena->Commit % PAGE_SIZE == 0);
             }
         }
         
         if (NewPos <= Arena->Commit)
         {
+#if ARENA_GUARD_PAGES
             // The only cases where Offset is not aligned to the requested alignment is when 
-            // the passed size is not a multiple of the alignement. This should only occur where
-            // push size is called directly, as allocated objects will have a size that is a multiple
+            // the passed size is not a multiple of the alignment. This should only occur where
+            // PushSize_ is called directly, as structs and arrays of structs will have a size that is a multiple
             // of their alignment.
-            u64 BytesToPageBoundary = PAGE_SIZE - (AllocEnd & (PAGE_SIZE - 1));
-            AllocStart += BytesToPageBoundary;
-            AllocStart = AllocStart & ~((u64)Alignment - 1);
+            u64 BytesToPageBoundary = AlignUp(AllocEnd, PAGE_SIZE) - AllocEnd;
+            u64 AllocStartGuardPageAdjacent = AlignDown(AllocStart + BytesToPageBoundary, Alignment);
+            PlatformMemoryGuard(Arena->Base + GuardStart, PAGE_SIZE);
+            
+            AllocStart = AllocStartGuardPageAdjacent;
+#endif
             
             Result = Arena->Base + AllocStart;
             Arena->Pos = NewPos;
-            
-            PlatformMemoryGuard(Arena->Base + GuardStart, PAGE_SIZE);
             
             if (ArenaPushFlags & ArenaPushFlags_ClearToZero)
             {
                 MemoryZero(Size, Result);
             }
+            
         }
     }
     
@@ -226,9 +232,9 @@ void *PushSize_(arena *Arena, u64 Size, u32 Alignment, u32 ArenaPushFlags)
 }
 #endif
 
-void *PushCopy_(arena *Arena, void *Source, u64 Size, u32 Alignment)
+void *PushCopy_(arena *Arena, u64 Size, void *Source, u32 Alignment)
 {
-    void *Memory = PushSize_(Arena, Size, Alignment, ArenaPushFlags_None);
+    void *Memory = PushSize_(Arena, Size, Alignment, NoClear());
     MemoryCopy(Size, Source, Memory);
     return Memory;
 }
@@ -256,14 +262,17 @@ void PopToPosition(arena *Arena, u64 Position)
         Arena->Commit = NewCommit;
     }
     
-    // TODO: What happens if Pos == NewPos, we try to virtualprotect zero bytes
-    
     Assert(ClampTop(Arena->Pos, Arena->Commit) >= NewPos);
     
-    u64 RemoveGuardStart = NewPos & (PAGE_SIZE - 1); // Round down to start of page
-    u64 RemoveGuardEnd   = AlignUp(ClampTop(Arena->Pos, Arena->Commit), PAGE_SIZE); // Round Upto start of page
+#if ARENA_GUARD_PAGES
+    u64 RemoveGuardStart = AlignDown(NewPos, PAGE_SIZE); 
+    u64 RemoveGuardEnd   = AlignUp(ClampTop(Arena->Pos, Arena->Commit), PAGE_SIZE); 
     u64 RemoveGuardSize  = RemoveGuardEnd - RemoveGuardStart;
-    PlatformMemoryRemoveGuard(Arena->Base + RemoveGuardStart, RemoveGuardSize);
+    if (RemoveGuardSize > 0)
+    {
+        PlatformMemoryRemoveGuard(Arena->Base + RemoveGuardStart, RemoveGuardSize);
+    }
+#endif
     
     Arena->Pos = NewPos;
 }
@@ -274,7 +283,6 @@ void PopSize(arena *Arena, u64 Size)
     PopToPosition(Arena, Arena->Pos - Size);
 }
 
-// TODO: Is this useful?
 void ClearArena(arena *Arena)
 {
     PopToPosition(Arena, ARENA_HEADER_SIZE);
@@ -361,13 +369,13 @@ string CreateString(u8 *StringData, u64 Length)
 u8 *PushCString(arena *Arena, u8 *String)
 {
     u64 Length = StringLength(String) + 1;
-    u8 *Memory = (u8 *)PushCopy_(Arena, String, Length, 1);
+    u8 *Memory = (u8 *)PushCopy_(Arena, Length, String, 1);
     return Memory;
 }
 
 string PushString(arena *Arena, string String)
 {
-    u8 *StringData = (u8 *)PushCopy_(Arena, String.Str, String.Length, 1);
+    u8 *StringData = (u8 *)PushCopy_(Arena, String.Length, String.Str, 1);
     return CreateString(StringData, String.Length);
 }
 
@@ -756,3 +764,588 @@ string string_builder::GetString(arena *Arena)
     return Result;
 }
 
+
+///////////////////////////////////////////////////////////////////////
+// Math
+//
+
+//
+// Scalar operations
+//
+
+inline f32 Cos(f32 Radians)
+{
+    return cosf(Radians);
+}
+
+inline f32 Sin(f32 Radians)
+{
+    return sinf(Radians);
+}
+
+inline f32 Atan2(f32 Y, f32 X)
+{
+    return atan2f(Y, X);
+}
+
+inline f32 Square(f32 A)
+{
+    return A * A;
+}
+
+inline f32 SquareRoot(f32 A)
+{
+    return sqrtf(A);
+}
+
+inline f32 Pow(f32 Base, f32 Exponent)
+{
+    return powf(Base, Exponent);
+}
+
+inline f32 AbsoluteValue(f32 A)
+{
+    return fabsf(A);
+}
+
+inline f32 Round(f32 A)
+{
+    return roundf(A);
+}
+
+inline f32 Floor(f32 A)
+{
+    return floorf(A);
+}
+
+inline f32 Lerp(f32 A, f32 t, f32 B)
+{
+    return (1.0f - t)*A + t*B;
+}
+
+inline f32 Clamp01(f32 Value)
+{
+    return Clamp(0.0f, Value, 1.0f);
+}
+
+constexpr f32 RadFromDeg(f32 Degrees)
+{
+    return Degrees * 0.01745329251994329576923690768489f;
+}
+
+constexpr f32 DegFromRad(f32 Radians)
+{
+    return Radians * 57.295779513082320876798154814105f;
+}
+
+//
+// Vector operations
+//
+
+inline v2 V2(f32 x, f32 y)
+{
+    return v2{x, y};
+}
+
+inline v3 V3(f32 x, f32 y, f32 z)
+{
+    return v3{x, y, z};
+}
+
+inline v3 V3(v2 xy, f32 z)
+{
+    return v3{xy.x, xy.y, z};
+}
+
+inline v4 V4(f32 x, f32 y, f32 z, f32 w)
+{
+    return v4{x, y, z, w};
+}
+
+inline v4 V4(v3 xyz, f32 w)
+{
+    return v4{xyz.x, xyz.y, xyz.z, w};
+}
+
+inline v2 operator+(v2 A, v2 B)          { return v2{A.x+B.x, A.y+B.y}; } 
+inline v2 operator-(v2 A, v2 B)          { return v2{A.x-B.x, A.y-B.y}; } 
+inline v2 operator-(v2 A)                { return v2{-A.x,   -A.y}; }           
+
+inline v2 operator*(f32 Scalar, v2 A)    { return v2{Scalar*A.x, Scalar*A.y}; }     
+inline v2 operator*(v2 A, f32 Scalar)    { return Scalar * A; }
+
+inline v2& operator+=(v2& A, v2 B)       { return (A = A + B); }
+inline v2& operator-=(v2& A, v2 B)       { return (A = A - B); }
+inline v2& operator*=(v2& A, f32 Scalar) { return (A = Scalar * A); }
+
+inline v3 operator+(v3 A, v3 B)          { return v3{A.x+B.x, A.y+B.y, A.z+B.z}; }
+inline v3 operator-(v3 A, v3 B)          { return v3{A.x-B.x, A.y-B.y, A.z-B.z}; }
+inline v3 operator-(v3 A)                { return v3{-A.x,   -A.y,    -A.z}; }
+
+inline v3 operator*(f32 Scalar, v3 A)    { return v3{Scalar*A.x, Scalar*A.y, Scalar*A.z}; }
+inline v3 operator/(f32 Scalar, v3 A)    { return v3{Scalar/A.x, Scalar/A.y, Scalar/A.z};}
+inline v3 operator*(v3 A, f32 Scalar)    { return Scalar * A; }
+inline v3 operator/(v3 A, f32 Scalar)    { return (1.0f / Scalar) * A; } // Faster less accurate version
+
+inline v3& operator+=(v3& A, v3 B)       { return (A = A + B); }
+inline v3& operator-=(v3& A, v3 B)       { return (A = A - B); }
+inline v3& operator*=(v3& A, f32 Scalar) { return (A = Scalar * A); }
+inline v3& operator/=(v3& A, f32 Scalar) { return (A = A / Scalar); }
+
+inline v4 operator+(v4 A, v4 B)          { return v4{A.x+B.x, A.y+B.y, A.z+B.z, A.w+B.w}; }
+inline v4 operator-(v4 A, v4 B)          { return v4{A.x-B.x, A.y-B.y, A.z-B.z, A.w-B.w}; }
+inline v4 operator-(v4 A)                { return v4{-A.x,   -A.y,    -A.z,    -A.w}; }
+
+inline v4 operator*(f32 Scalar, v4 A)    { return v4{Scalar*A.x, Scalar*A.y, Scalar*A.z, Scalar*A.w}; }
+inline v4 operator/(f32 Scalar, v4 A)    { return v4{Scalar/A.x, Scalar/A.y, Scalar/A.z, Scalar/A.w }; } 
+inline v4 operator*(v4 A, f32 Scalar)    { return Scalar*A; }
+inline v4 operator/(v4 A, f32 Scalar)    { return (1.0f / Scalar) * A; }
+
+inline v4& operator+=(v4& A, v4 B)       { return (A = A + B); }
+inline v4& operator-=(v4& A, v4 B)       { return (A = A - B); }
+inline v4& operator*=(v4& A, f32 Scalar) { return (A = Scalar * A); }
+inline v4& operator/=(v4& A, f32 Scalar) { return (A = A / Scalar); }
+
+inline f32 Inner(v2 A, v2 B)
+{
+    return A.x*B.x + A.y*B.y;
+}
+
+inline v2 Perp(v2 A)
+{
+    return v2{-A.y, A.x};
+}
+
+inline v2 Hadamard(v2 A, v2 B)
+{
+    return v2{A.x*B.x, A.y*B.y};
+}
+
+inline f32 LengthSq(v2 A)
+{
+    return Inner(A, A);
+}
+
+inline f32 Length(v2 A)
+{
+    return SquareRoot(LengthSq(A));
+}
+
+inline v2 Normalize(v2 A)
+{
+    return A * (1.0f / Length(A));
+}
+
+inline v2 Clamp01(v2 Value)
+{
+    return v2{Clamp01(Value.x), Clamp01(Value.y)};
+}
+
+
+inline v3 Lerp(v3 A, f32 t, v3 B)
+{
+    return (1.0f - t)*A + t*B;
+}
+
+inline v3 Hadamard(v3 A, v3 B)
+{
+    return v3{A.x*B.x, A.y*B.y, A.z*B.z};
+}
+
+inline f32 Inner(v3 A, v3 B)
+{
+    return A.x*B.x + A.y*B.y + A.z*B.z;
+}
+
+inline v3 Cross(v3 A, v3 B)
+{
+    return v3{
+        A.y*B.z - A.z*B.y,
+        A.z*B.x - A.x*B.z,
+        A.x*B.y - A.y*B.x,
+    };
+}
+
+inline f32 LengthSq(v3 A)
+{
+    return Inner(A, A);
+}
+
+inline f32 Length(v3 A)
+{
+    return SquareRoot(LengthSq(A));
+}
+
+inline v3 Normalize(v3 A)
+{
+    return A * (1.0f / Length(A));
+}
+
+inline v3 NOZ(v3 A)
+{
+    v3 Result = {};
+    
+    f32 LengthSquared = LengthSq(A);
+    if(LengthSquared > Square(0.0001f))
+    {
+        Result = A * (1.0f / SquareRoot(LengthSquared));
+    }
+    
+    return Result;
+}
+
+inline v3 Clamp01(v3 Value)
+{
+    return v3{Clamp01(Value.x), Clamp01(Value.y), Clamp01(Value.z)};
+}
+
+
+inline v4 Hadamard(v4 A, v4 B)
+{
+    return v4{A.x*B.x, A.y*B.y, A.z*B.z, A.w*B.w};
+}
+
+inline f32 Inner(v4 A, v4 B)
+{
+    return A.x*B.x + A.y*B.y + A.z*B.z + A.w*B.w;
+}
+
+inline f32 LengthSq(v4 A)
+{
+    return Inner(A, A);
+}
+
+inline f32 Length(v4 A)
+{
+    return SquareRoot(LengthSq(A));
+}
+
+inline v4 Clamp01(v4 Value)
+{
+    return v4{Clamp01(Value.x), Clamp01(Value.y), Clamp01(Value.z), Clamp01(Value.w)};
+}
+
+inline v4 Lerp(v4 A, f32 t, v4 B)
+{
+    return (1.0f - t)*A + t*B;
+}
+
+//
+// Matrix operations
+//
+
+v4 operator*(m4x4 M, v4 V)
+{
+    v4 Result {
+        M.E[0][0] * V.x + M.E[0][1] * V.y + M.E[0][2] * V.z + M.E[0][3] * V.w,
+        M.E[1][0] * V.x + M.E[1][1] * V.y + M.E[1][2] * V.z + M.E[1][3] * V.w,
+        M.E[2][0] * V.x + M.E[2][1] * V.y + M.E[2][2] * V.z + M.E[2][3] * V.w,
+        M.E[3][0] * V.x + M.E[3][1] * V.y + M.E[3][2] * V.z + M.E[3][3] * V.w,
+    };
+    
+    return Result;
+}
+
+m4x4 operator*(m4x4 A, m4x4 B)
+{
+    m4x4 Result  = {};
+    for (s32 Row = 0; Row < 4; ++Row)
+    {
+        for (s32 Col = 0; Col < 4; ++Col)
+        {
+            Result.E[Row][Col] = 
+                A.E[Row][0] * B.E[0][Col] +
+                A.E[Row][1] * B.E[1][Col] +
+                A.E[Row][2] * B.E[2][Col] +
+                A.E[Row][3] * B.E[3][Col];
+        }
+    }
+    
+    return Result;
+}
+
+m4x4 Identity()
+{
+    return m4x4 {
+        1.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, 1.0f
+    };
+};
+
+m4x4 RotateZ(f32 Angle)
+{
+    f32 c = Cos(Angle);
+    f32 s = Sin(Angle);
+    return m4x4 {
+        c,    -s,   0.0f, 0.0f,
+        s,    c,    0.0f, 0.0f,
+        0.0f, 0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, 1.0f
+    };
+}
+
+m4x4 RotateX(f32 Angle)
+{
+    f32 c = Cos(Angle);
+    f32 s = Sin(Angle);
+    return m4x4 {
+        1.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, c,    -s,   0.0f,
+        0.0f, s,    c,    0.0f,
+        0.0f, 0.0f, 0.0f, 1.0f
+    };
+}
+
+m4x4 RotateY(f32 Angle)
+{
+    f32 c = Cos(Angle);
+    f32 s = Sin(Angle);
+    return m4x4 {
+        c,    0.0f, s,    0.0f,
+        0.0f, 1.0f, 0.0f, 0.0f,
+        -s,   0.0f, c,    0.0f,
+        0.0f, 0.0f, 0.0f, 1.0f
+    };
+}
+
+m4x4 Scale(f32 S)
+{
+    return m4x4 {
+        S, 0.0f, 0.0f, 0.0f,
+        0.0f, S, 0.0f, 0.0f,
+        0.0f, 0.0f, S, 0.0f,
+        0.0f, 0.0f, 0.0f, 1.0f
+    };
+}
+
+m4x4 Translation(v3 T)
+{
+    return m4x4 {
+        1.0f, 0.0f, 0.0f, T.x,
+        0.0f, 1.0f, 0.0f, T.y,
+        0.0f, 0.0f, 1.0f, T.z,
+        0.0f, 0.0f, 0.0f, 1.0f
+    };
+}
+
+m4x4 LookAt(v3 CameraP, v3 TargetP, v3 WorldUp)
+{
+    /*
+          CameraP = (1, 0, 0) in our z-is-up worldspace
+          CameraTarget = (1, 0, 0) in our z-is-up worldspace
+    
+LookAt performs two transformations, translating the scene from the eye (camera) position to the origin,
+then rotating the scene in the reverse orientation of the camera.
+
+View = Rotate * Tranlate 
+   
+Translate = 
+|1 0 0 -CameraP.x|
+|0 1 0 -CameraP.y|
+|0 0 1 -CameraP.z|
+|0 0 0 1         |
+
+Rotate:
+
+GlobalUp = (0, 1, 0) TODO: Maybe this is (0, 0, 1) in our worldspace
+front = Normalise(CameraP - CameraTarget)
+ right = Cross(GlobalUp, front) // normalised by cross
+up = Cross(front, right) 
+
+Rotate is the inverse of the matrix made with these these basis vectors.
+As the matrix has orthogonal unit length vectors, its inverse is equal to the transpose.
+
+Rotate = 
+    |rx ux fx 0|^-1     |rx ry rz 0|
+    |ry uy fy 0|     =  |ux uy uz 0|
+    |rz uz fz 0|        |fx fy yz 0|
+    |0  0  0  1|        |0  0  0  1|
+
+    View = 
+|rx ry rz 0| |1 0 0 -Px|   |ry ry rz -rxPx-ryPy-rzPz|
+|ux uy uz 0| |0 1 0 -Py| = |ux uy uz -uxPx-uyPy-uzPz|
+|fx fy yz 0| |0 0 1 -Pz|   |fx fy fz -fxPx-fyPy-fzPz|
+ |0  0  0  1| |0 0 0 1  |   |0  0  0         1       |
+
+* Where P is the camera (eye) position
+
+        */
+    
+    // We set up a set of basis vectors matching what OpenGL expects
+    // So all our world coordinates will be in OpenGL coordinate system (y is up, looking in -z direction)
+    v3 Front = Normalize(CameraP - TargetP);    // Pointing away from scene (into camera as OpenGL expects) 
+    v3 Side = Normalize(Cross(WorldUp, Front));  // TODO: If Front and Up are aligned this is bad
+    v3 Up = Normalize(Cross(Front, Side));
+    
+#if 0
+    // The two matrices that make CameraViewInverse
+    m4x4 RotateInv = {
+        Side.x,  Side.y,  Side.z,  0.0f,
+        Up.x,    Up.y,    Up.z,    0.0f,
+        Front.x, Front.y, Front.z, 0.0f,
+        0.0f,    0.0f,    0.0f,    1.0f 
+    };
+    
+    m4x4 Translate = {
+        1.0f, 0,    0,     -CameraP.x,
+        0,    1.0f, 0,     -CameraP.y,
+        0,    0,    1.0f,  -CameraP.z,
+        0,    0,    0,     1.0f
+    };
+    
+    m4x4 CameraViewInverse = RotateInv * Translate;
+#endif
+    
+    m4x4 CameraViewInverse = {
+        Side.x,  Side.y,  Side.z,  -Inner(Side,  CameraP),
+        Up.x,    Up.y,    Up.z,    -Inner(Up,    CameraP),
+        Front.x, Front.y, Front.z, -Inner(Front, CameraP),
+        0.0f,    0.0f,    0.0f,    1.0f
+    };
+    
+    return CameraViewInverse;
+    
+    
+    /* NOTE:
+This can also be thought of as multiplying a point with the camera transform matrix.
+|a b c| (camera x axis)  |x|    |x dot camera x axis|
+|d e f| (camera y axis)  |y|  = |y dot camera y axis|
+ |g h i| (camera z axis)  |z|    |z dot camera z axis|
+
+Where we measure how far along the camera's axes the point is, thus transforming the world coordinate
+into view space.
+"The row perspective of a matrix".
+*/
+}
+
+m4x4 PerspectiveProjection(f32 AspectWidthOverHeight, f32 FocalLength, f32 NearClipPlane, f32 FarClipPlane)
+{
+    // L is focal length
+    // A is Aspect ration (Width / Height)
+    
+    // L is also equal to cotangent(theta) (or equivalently 1/tan(theta))
+    // A theta angle of FOV/2 is commonly used instead of focal length for constructing the projection matrix, 
+    // (FOV is the vertical viewing angle, divided by two because it is the angle from the centre to the top 
+    // of the focal plane). The horizontal viewing angle can also be used (with a different formula).
+    // As L increased theta increases and cot(theta) increases. This is the focal plane moving closer into
+    // the frustum and scaling the image with a zoom effect. 
+    // The Near and Far planes are defined in world coordinates.
+    
+    // OpenGL matrix you see online will be:   
+    // L/A  0   0              0
+    // 0    L   0              0
+    // 0    0   -(F+N)/(F-N)  -2NF/(F-N)
+    // 0    0   -1             0
+    // This matrix has a negated third row, which serves to flip the projected image on the z axis.
+    // Although OpenGL has the -z axis point away from the camera, in the depth buffer smaller values
+    // are considered closer, hence the flip.
+    
+    // Maps a frustum volume into a cube surrounding the camera at (0, 0, 0) with corner coordinates of -1 to 1.
+    // The resulting coordinates are NDC being from -1 to 1.
+    
+    f32 a = AspectWidthOverHeight;
+    f32 l = FocalLength;
+    
+    f32 n = NearClipPlane; 
+    f32 f = FarClipPlane; 
+    
+    f32 d = -(f+n) / (f-n);
+    f32 e = -(2*f*n) / (f-n);
+    
+    m4x4 Result = {
+        l/a, 0,  0,  0,
+        0,   l,  0,  0,
+        0,   0,  d,  e,
+        0,   0, -1,  0,
+    };
+    
+    return Result;
+}
+
+m4x4 OrthographicProjection3D(f32 Left, f32 Right, f32 Bottom, f32 Top, f32 Near, f32 Far)
+{
+    // Map the left and right screen coordinates to -1 to 1 (For OpenGL)
+    // l <= x <= r            If x is a point within left and right:
+    // 0 <= x-l <= r-l    Make the left side 0 by subtracting l from all terms
+    // 0 <= x-l / (r-l) <= 1   Make the right side 1 by dividing by (r - l)
+    // 0 <= 2((x-l) / (r-l)) <= 2 
+    // -1 <= 2((x-l) / (r-l)) - 1 <= 1 Multiply by 2 and subtract to to map to [-1, 1]
+    
+    // -1 <= 2((x-l) / (r-l)) - ((r-l)/(r-l)) <= 1   Replace -1 with ((r-l)/(r-l))
+    // -1 <= (2x-l-r) / (r-l) <= 1   Simplify
+    // -1 <= 2x / (r-l) - (r+l) / (r-l) <= 1   Gives us the formula to transform x
+    // x' = (2 / (r-l)) * x - (r+l) / (r-l)
+    
+    // Then by using this in the rows of our matrix 
+    // vec = (x, 0, 0, 1) dot matrix x row = (2/(r-l), 0, 0, -(r+l)/(r-l))  
+    //     = x'
+    // Giving us the x component for the projected vector.
+    // This works similarly for y and z components (z is negated as the camera faces the -z axis)
+    
+    // Maps a rectangular volume to a cube centred at (0, 0, 0) with with corners having coordinates -1 to 1
+    // The resulting coordinates are NDC which are from -1 to 1 for each component.
+    
+    f32 a = 2.0f / (Right - Left);
+    f32 b = 2.0f / (Top - Bottom);
+    f32 c = -2.0f / (Far - Near); 
+    
+    f32 d = -(Right + Left) / (Right - Left);
+    f32 e = -(Top + Bottom) / (Top - Bottom);
+    f32 f = -(Far + Near) / (Far - Near);
+    
+    m4x4 Result = {
+        a,  0,  0,  d,
+        0,  b,  0,  e,
+        0,  0,  c,  f,
+        0,  0,  0,  1,
+    };
+    
+    return Result;
+}
+
+m4x4 OrthographicProjection2D(f32 Left, f32 Right, f32 Bottom, f32 Top)
+{
+    f32 a = 2.0f / (Right - Left);
+    f32 b = 2.0f / (Top - Bottom);
+    
+    f32 d = -(Right + Left) / (Right - Left);
+    f32 e = -(Top + Bottom) / (Top - Bottom);
+    
+    m4x4 Result = {
+        a,  0,  0,  d,
+        0,  b,  0,  e,
+        0,  0,  -1, 0,
+        0,  0,  0,  1, 
+    };
+    
+    return Result;
+}
+
+#if 0
+v3 Orbit(v3 CameraP, v3 Target, f32 AzimuthRadians, f32 InclinationRadians)
+{
+    // Transform to spherical coordinates, add azimuth and inclination, then transform back.
+    // Assumes z-is-up right handed coordinate system.
+    
+    v3 P = CameraP - Target;
+    
+    f32 r = Length(P);
+    P = NOZ(P);
+    
+    f32 Inclination = acos(P.z) + InclinationRadians;
+    f32 Azimuth = atan2(P.y, P.x) + AzimuthRadians;
+    
+    Inclination = Clamp(0.01f, Inclination, Pi32 - 0.01f);
+    
+    f32 x = cos(Azimuth) * sin(Inclination);
+    f32 y = sin(Azimuth) * sin(Inclination);
+    f32 z = cos(Inclination);
+    v3 RotatedP = r * V3(x, y, z);
+    
+    v3 Result = RotatedP + Target;
+    
+    return Result;
+}
+#endif

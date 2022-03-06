@@ -1,7 +1,16 @@
 #pragma once
 
-#include <stdarg.h>
 #include <stdint.h>
+#include <float.h> // FLT_MAX TODO: Remove this
+
+///////////////////////////////////////////////////////////////////////
+// Usage
+//
+
+// Flags:
+// BASE_DEBUG         Enables asserts. Enabled by default.
+// ARENA_GUARD_PAGES  Enables buffer overflow checking for arena allocations. Enabled if BASE_DEBUG is on.
+
 
 ///////////////////////////////////////////////////////////////////////
 // Platform detection
@@ -19,12 +28,13 @@
 #error "Could not detect operating system"
 #endif
 
-#if defined(_MSC_VER)
+// Check clang first because clang often will define __GNUC__ or _MSC_VER as well
+#if defined(__clang__)
+#define BASE_COMPILER_CLANG 1
+#elif defined(_MSC_VER)
 #define BASE_COMPILER_MSVC 1
 #elif defined(__GNUC__)
 #define BASE_COMPILER_GCC 1
-#elif defined(__clang__)
-#define BASE_COMPILER_CLANG 1
 #else
 #error "Could not detect compiler"
 #endif
@@ -33,8 +43,8 @@
 #define BASE_ARCH_X86 1              // 32-bit x86 architecture
 #elif defined(_M_X64) || defined(__x86_64__) 
 #define BASE_ARCH_X64 1              // 64-bit x86 architecture
-#elif defined(__arm__)
-#define BASE_ARCH_ARM 1              // Could be 32 or 64-bit (could use __aarch64__ to detect further)
+#elif defined(__arm__) 
+#define BASE_ARCH_ARM 1              
 #else
 #error "Could not detect CPU architecture"
 #endif
@@ -148,8 +158,6 @@ typedef int8_t   b8;
 typedef float    f32;
 typedef double   f64;
 
-#define U32_MAX 
-
 static_assert(sizeof(u8)  == 1, "");
 static_assert(sizeof(u16) == 2, "");
 static_assert(sizeof(u32) == 4, "");
@@ -166,6 +174,10 @@ static_assert(sizeof(u64) == sizeof(s64), "");
 ///////////////////////////////////////////////////////////////////////
 // Arena
 //
+
+#if !defined(ARENA_GUARD_PAGES) && (BASE_DEBUG == 1)
+#define ARENA_GUARD_PAGES 1
+#endif
 
 struct arena
 {
@@ -212,7 +224,7 @@ arena *     CreateArena(u64 ReserveSize);
 void        FreeArena(arena *Arena);
 
 void *      PushSize_(arena *Arena, u64 Size, u32 Alignment, u32 ArenaPushFlags = ClearToZero());
-void *      PushCopy_(arena *Arena, void *Source, u64 Size, u32 Alignment); 
+void *      PushCopy_(arena *Arena, u64 Size, void *Source, u32 Alignment); 
 void        PopToPosition(arena *Arena, u64 Pos);
 void        PopSize(arena *Arena, u64 Size);
 void        ClearArena(arena *Arena);
@@ -225,12 +237,10 @@ void        ReleaseScratch(temp_memory ScratchMemory);
 
 
 // ## __VA_ARGS is an extension on gcc and clang, and the MSVC preprocessor will eat trailing commas when 
-// VA_ARGS is empty. 
+// VA_ARGS is empty. But this will generate warnings with pedantic error checking.
 #define PushArray(Arena, Count, Type, ...) (Type *)PushSize_((Arena), (Count)*sizeof(Type), alignof(Type), ##__VA_ARGS__)
 
 #define PushStruct(Arena, Type, ...) (Type *)PushSize_((Arena), sizeof(Type), alignof(Type) ##__VA_ARGS__)
-
-#define PushCopy(Arena, Source, Count, Type) (Type *)PushCopy_((Arena), (void *)(Source), (Count)*sizeof(Type), alignof(Type))
 
 ///////////////////////////////////////////////////////////////////////
 // String
@@ -319,53 +329,30 @@ string_builder CreateStringBuilder();
 // Math
 //
 
-#include <math.h>
-#include <float.h>
+// TODO: integer vector, interval types ({min, max} union {p0, p1} union {x0, x1, y0, x1})
 
-#define R32Max FLT_MAX
-#define R32Min -FLT_MAX
-#define Pi32 3.14159265359f
-#define Tau32 6.28318530717958647692f
+constexpr f32 F32Max = FLT_MAX;
+constexpr f32 F32Min = -FLT_MAX;
+constexpr f32 Pi32   = 3.14159265359f;
+constexpr f32 Tau32  = 6.28318530717958647692f;
 
-#if 0
+// Anonymous structs are a compiler extension, and will generate warnings
+// Anonymous unions are allowed, however you need anonymous structs to get simple swizzling.
+
 union v2
 {
-    struct
-    {
-        f32 x, y;
-    };
-    struct
-    {
-        f32 u, v;
-    };
-    struct
-    {
-        f32 Width, Height;
-    };
+    struct { f32 x, y; };
+    struct { f32 u, v; };
+    struct { f32 Width, Height; };
     f32 E[2];
 };
 
-
 union v3
 {
-    struct
-    {
-        f32 x, y, z;
-    };
-    struct
-    {
-        f32 r, g, b;
-    };
-    struct
-    {
-        v2 xy;
-        f32 Ignored0_;
-    };
-    struct
-    {
-        f32 Ignored1_;
-        v2 yz;
-    };
+    struct { f32 x, y, z; };
+    struct { f32 r, g, b; };
+    struct { v2  xy; f32 Ignored0_; };
+    struct { f32 Ignored1_; v2 yz; };
     f32 E[3];
 };
 
@@ -376,12 +363,8 @@ union v4
         union
         {
             v3 xyz;
-            struct
-            {
-                f32 x, y, z;
-            };
+            struct { f32 x, y, z; };
         };
-        
         f32 w;
     };
     struct
@@ -389,10 +372,7 @@ union v4
         union
         {
             v3 rgb;
-            struct
-            {
-                f32 r, g, b;
-            };
+            struct { f32 r, g, b; };
         };
         
         f32 a;
@@ -418,18 +398,15 @@ union v4
     f32 E[4];
 };
 
-// This is OK as anonymous unions are allowed
-struct vec2
+struct m4x4
 {
-    union
-    {
-        float x, left, u;
-    };
-    union
-    {
-        float y, right, v;
-    };
-    
+    // Stored in Row-Major (basis vectors are not contiguous like OpenGL expects)
+    // Initialised so that floats can be written in 'column-major' order.
+    // e.g.
+    //   xvec  yvec  zvec  wvec
+    // { 1.0f, 0.0f, 0.0f, 0.0f,
+    //   0.0f, 1.0f, 0.0f, 0.0f,
+    //   0.0f, 0.0f, 1.0f, 0.0f,
+    //   0.0f, 0.0f, 0.0f, 1.0f };
+    f32 E[4][4];
 };
-
-#endif

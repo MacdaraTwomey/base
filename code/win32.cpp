@@ -311,13 +311,15 @@ void PlatformMemoryFree(void *Address)
 void PlatformMemoryGuard(void *Address, u64 Size)
 {
     // Only for debug builds
-    Assert(Address);
     
     // Undefined behaviour 
+    Assert(Address);
     u64 AddressInt = (u64)Address;
     Assert((AddressInt & (4096 - 1)) == 0);
     Assert((Size & (4096 - 1)) == 0);
     
+    // We aren't using PAGE_GUARD as that throws an exception, then reverts to the old protection.
+    // PAGE_NOACCESS just throws the access violation.
     DWORD OldProtectFlags;
     BOOL Success = VirtualProtect(Address, Size, PAGE_NOACCESS, &OldProtectFlags);
     Assert(Success);
@@ -326,9 +328,9 @@ void PlatformMemoryGuard(void *Address, u64 Size)
 void PlatformMemoryRemoveGuard(void *Address, u64 Size)
 {
     // Only for debug builds
-    Assert(Address);
     
     // Undefined behaviour 
+    Assert(Address);
     u64 AddressInt = (u64)Address;
     Assert((AddressInt & (4096 - 1)) == 0);
     Assert((Size & (4096 - 1)) == 0);
@@ -337,39 +339,6 @@ void PlatformMemoryRemoveGuard(void *Address, u64 Size)
     BOOL Success = VirtualProtect(Address, Size, PAGE_READWRITE, &OldProtectFlags);
     Assert(Success);
 }
-
-struct test
-{
-    u8 A;
-    u8 B;
-    u16 D;
-    u8 C;
-};
-
-static_assert(sizeof(test) == 6, "size is ");
-static_assert(alignof(test) == 2, "align is ");
-
-struct test2
-{
-    u8 A;
-    u8 B;
-    u8 C;
-};
-
-static_assert(sizeof(test2) == 3, "size is ");
-static_assert(alignof(test2) == 1, "align is ");
-
-#pragma pack(push, 1)
-struct test3
-{
-    u16 A;
-    u16 B;
-    u8 C;
-};
-#pragma pack(pop)
-
-static_assert(sizeof(test3) == 5, "size is ");
-static_assert(alignof(test3) == 1, "align is ");
 
 void PageProtection(char *Buffer, DWORD ProtectionFlags)
 {
@@ -390,13 +359,14 @@ void PageProtection(char *Buffer, DWORD ProtectionFlags)
 
 void QueryPages(arena *Arena)
 {
+    u64 PageIndex = 0;
     for (u64 i = 0; i < Arena->Commit + 4096; i += 4096)
     {
         MEMORY_BASIC_INFORMATION Info = {};
         SIZE_T Size = VirtualQuery(Arena->Base + i, &Info, sizeof(Info));
         Assert(Size);
         
-        char *State = "UNKNOWN";
+        const char *State = "UNKNOWN";
         if (Info.State == MEM_COMMIT) State = "MEM_COMMIT";
         if (Info.State == MEM_FREE) State = "MEM_FREE";
         if (Info.State == MEM_RESERVE) State = "MEM_RESERVE";
@@ -407,18 +377,26 @@ void QueryPages(arena *Arena)
         char Protection[4069] = {};
         PageProtection(Protection, Info.Protect); 
         
-        printf("%p initial: %s, region size: %llu, state %s, protect: %s\n", 
+        printf("%llu:  %p region size: %llu, state %s, protect: %s\n", 
+               PageIndex,
                Info.BaseAddress, 
-               InitialProtection, 
                Info.RegionSize, State, 
                Protection);
+        
+        PageIndex += 1;
     }
     
     printf("\n");
 }
 
 
-
+struct test
+{
+    u32 A;
+    u32 B;
+    u32 C;
+    u64 D;
+};
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine, int nCmdShow)
 {
     (void)hInstance;
@@ -452,24 +430,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
 #if 0
     {
         arena *Arena = CreateArena(GB(1));
-        test *Test = PushStruct(Arena, test);
-        Test->A = 0;
-        Test->B = 1;
-        Test->D = 3;
-        Test->C = 2;
-        
-        test *After = Test + 1;
-        After->B = 2;
-        u8 Load = After->A;
-        
-        int x = 99;
-        FreeArena(Arena);
-    }
-#endif
-    
-#if 0    
-    {
-        arena *Arena = CreateArena(GB(1));
         test *Test = PushArray(Arena, 2, test);
         Test->A = 0;
         Test->B = 1;
@@ -484,7 +444,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
         
         test *After = Test + 1;
         After->B = 2;
-        u8 Load = After->A;
+        u32 Load = After->A;
         
         int x = 99;
         FreeArena(Arena);
@@ -520,6 +480,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
         
         QueryPages(Arena);
         u32 *Array4 = PushArray(Arena, 10000, u32);
+        QueryPages(Arena);
         for (u32 i = 0; i < 10000; ++i)
         {
             Array4[i] = i;
@@ -539,6 +500,29 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
         PopSize(Arena, 500);
         
         QueryPages(Arena);
+        
+        ClearArena(Arena);
+        QueryPages(Arena);
+        u64 *Array6 = PushArray(Arena, 234223, u64);
+        for (u64 i = 0; i < 234223; ++i)
+        {
+            Array6[i] = i;
+        }
+        
+        QueryPages(Arena);
+        
+        // Non multiple of 4 size
+        u8 *Array7 = (u8 *)PushSize_(Arena, 74, 4);
+        for (u32 i = 0; i < 74; ++i)
+        {
+            Array7[i] = 3;
+        }
+        
+        // Because of alignment and size of this allocation there is a small gap between the end of the allocation
+        // and the start of the guard page
+        Array7[74] = 4;
+        u8 Temp = Array7[74];
+        Array7[75] = Temp;
         
         FreeArena(Arena);
     }
@@ -561,12 +545,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
         
         u64 Pos = Arena->Pos;
         
-        f32 *F32Array1 = (f32 *)PushSize_(Arena,             MB(40), 4, NoClear());
-        f32 *F32Array2 = (f32 *)PushCopy_(Arena,  F32Array1, MB(40), 4);
-        f32 *F32Array3 =        PushCopy(Arena,  F32Array1, MB(40), f32);
+        f32 *F32Array1 = (f32 *)PushSize_(Arena, MB(40), 4, NoClear());
+        f32 *F32Array2 = (f32 *)PushCopy_(Arena, MB(40), F32Array1, alignof(f32));
         MemoryZero(MB(40), F32Array1);
         MemoryZero(MB(40), F32Array2);
-        MemoryZero(sizeof(f32) * MB(40), F32Array3);
         
         PopToPosition(Arena, Pos);
         
@@ -777,9 +759,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
         FreeArena(Arena);
     }
     
-    //v2 A = v2{0.1f, 1.0f};
-    //vec2 B = vec2{0.1f, 1.0f};
-    
+    {
+        v2 A = V2(0.1f, 1.0f);
+        
+        
+    }
     return 0;
 }
 
