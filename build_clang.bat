@@ -3,7 +3,7 @@
 
 set SourceFiles=..\code\win32.cpp
 
-set IncludeDirs=
+set IncludeDirs=..\deps
 
 set LinkedLibraries=-lopengl32.lib -lgdi32.lib -luser32.lib
 

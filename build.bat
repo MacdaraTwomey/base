@@ -3,9 +3,9 @@
 
 set SourceFiles=..\code\win32.cpp
 
-set IncludeDirs=
+set IncludeDirs=-I..\deps
 
-set LinkedLibraries=opengl32.lib gdi32.lib user32.lib
+set LinkedLibraries=opengl32.lib gdi32.lib user32.lib 
 
 pushd build
 

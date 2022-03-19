@@ -1,0 +1,28 @@
+// * Contains a list of the OpenGL functions that will be loaded at runtime.
+//   The macro OpenGLFunction must be #define'd before this header is included, then #undef'd after.
+// * This macro can be defined to automate the declaring of global variables used to store the function
+//   addresses or, be used to automate the population of these global variables with the correct function
+//   addresses.
+
+OpenGLFunction(Viewport, VIEWPORT)
+OpenGLFunction(GetString, GETSTRING)
+OpenGLFunction(GetStringi, GETSTRINGI)
+OpenGLFunction(GetIntegerv, GETINTEGERV)
+OpenGLFunction(ClearColor, CLEARCOLOR)
+OpenGLFunction(Clear, CLEAR)
+OpenGLFunction(CreateShader, CREATESHADER)
+OpenGLFunction(ShaderSource, SHADERSOURCE)
+OpenGLFunction(CompileShader, COMPILESHADER)
+OpenGLFunction(AttachShader, ATTACHSHADER)
+OpenGLFunction(GetShaderiv, GETSHADERIV)
+OpenGLFunction(GetShaderInfoLog, GETSHADERINFOLOG)
+OpenGLFunction(CreateProgram, CREATEPROGRAM)
+OpenGLFunction(LinkProgram, LINKPROGRAM)
+OpenGLFunction(ValidateProgram, VALIDATEPROGRAM)
+OpenGLFunction(GetProgramiv, GETPROGRAMIV)
+OpenGLFunction(GetProgramInfoLog, GETPROGRAMINFOLOG)
+OpenGLFunction(DeleteShader, DELETESHADER)
+OpenGLFunction(Enable, ENABLE)
+OpenGLFunction(DebugMessageCallback, DEBUGMESSAGECALLBACK)
+OpenGLFunction(DebugMessageControl, DEBUGMESSAGECONTROL)
+
