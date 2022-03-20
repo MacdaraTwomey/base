@@ -400,10 +400,10 @@ void RunTests()
     
     {
         
-        u8 Contents[] = "lsdkfj;asdlkfj;alskdjf;alskdjf;lkasdjf;l";
+        //u8 Contents[] = "lsdkfj;asdlkfj;alskdjf;alskdjf;lkasdjf;l";
         
         // Longest path that I can make a file with, 268 chars including prefix
-        string LongFileName = StringLit("\\\\?\\C:\\files\\ABCDEFGHIJKLMNOPQRSTjkhsdkfjghsdklfjghlsdkjfhglksdjfhglksjdfhglksdjfhglkjdhsfgldksfjghlsdkfjhglkgjhsdlfkjghsldkfjghlsdkfjhglsdkjfhgldfhjgllkdjfhlkdasjhflsdkjfhlasjdhfljkasdhflkjahsdflhasdlkfjhasldkfhalsdkjfhlaskdjhflkasdhflaksdjhfakalaks0123456789abcdefgh");
+        //string LongFileName = StringLit("\\\\?\\C:\\files\\ABCDEFGHIJKLMNOPQRSTjkhsdkfjghsdklfjghlsdkjfhglksdjfhglksjdfhglksdjfhglkjdhsfgldksfjghlsdkfjhglkgjhsdlfkjghsldkfjghlsdkfjhglsdkjfhgldfhjgllkdjfhlkdasjhflsdkjfhlasjdhfljkasdhflkjahsdflhasdlkfjhasldkfhalsdkjfhlaskdjhflkasdhflaksdjhfakalaks0123456789abcdefgh");
         
         //Assert(PlatformWriteEntireFile(sizeof(Contents), Contents, LongFileName));
         

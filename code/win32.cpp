@@ -21,7 +21,7 @@ static HMODULE OpenGL32DLL = nullptr;
 
 //
 // TODO:
-// - PLATFORM_ERROR_MESSAGE to make message box
+// - PLATFORM_ERROR_MESSAGE to make message box?
 
 HANDLE Win32CreateConsole()
 {
@@ -364,18 +364,14 @@ LRESULT CALLBACK Win32WindowProc(HWND Window, UINT Message, WPARAM wParam, LPARA
             GlobalAppRunning = false;
         } break;
         
-        case WM_MOUSEWHEEL: 
-        case WM_MOUSEMOVE: 
-        case WM_LBUTTONUP: 
-        case WM_LBUTTONDOWN: 
-        case WM_LBUTTONDBLCLK: 
-        case WM_RBUTTONUP: 
-        case WM_RBUTTONDBLCLK: 
         case WM_SYSKEYDOWN:
-        case WM_SYSKEYUP:
         case WM_KEYDOWN:
-        case WM_KEYUP:
         {
+            WPARAM VKCode = wParam;
+            if (VKCode == VK_ESCAPE)
+            {
+                GlobalAppRunning = false;
+            }
         }
         
         default:
@@ -581,7 +577,6 @@ bool Win32CreateOpenGLContext(HDC WindowDC)
     return Success;
 }
 
-
 void Win32LoadOpenGLFunctions()
 {
 #define OpenGLFunction(Name, Type) gl##Name = (PFNGL##Type##PROC) Win32LoadOpenGLFunction("gl"#Name);
@@ -598,8 +593,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
     
     Win32CreateConsole();
     
-    int WindowWidth = 720;
-    int WindowHeight = 480;
+    int WindowWidth = 1280;
+    int WindowHeight = 720;
     
     // TODO: DO we need to call AdjustWindowRect for correctly sized window because of border stuff?
     // Create real window
@@ -635,17 +630,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
                 {
                     SetSwapInterval(1);
                     Win32LoadOpenGLFunctions();
-                    
-                    char *Version = (char *)glGetString(GL_VERSION);
-                    printf("%s\n", Version);
-                    
-                    GLint ExtensionCount = 0;
-                    glGetIntegerv(GL_NUM_EXTENSIONS, &ExtensionCount);
-                    for (GLint i = 0; i < ExtensionCount; ++i)
-                    {
-                        char *Extension = (char *)glGetStringi(GL_EXTENSIONS, i);
-                        printf("%s\n", Extension);
-                    }
                 }
             }
             
@@ -674,7 +658,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
             }
         }
         
-        OpenGLEndFrame();
+        OpenGLEndFrame(WindowWidth, WindowHeight);
         
         SwapBuffers(wglGetCurrentDC());
     }
