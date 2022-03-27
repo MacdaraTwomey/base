@@ -2,12 +2,19 @@
 #include "base.h"
 #include "platform.h"
 #include "base.cpp"
-#include "ring_buffer.h"
 
 #include <windows.h>
 
+//#define GL_VERSION_3_3 0
+//#define GL_VERSION_4_0 0
+//#define GL_VERSION_4_1 0
+//#define GL_VERSION_4_2 0
+//#define GL_VERSION_4_3 0
+//#define GL_VERSION_4_4 0
+//#define GL_VERSION_4_5 0
+//#define GL_VERSION_4_6 0
 #include "GL/glcorearb.h"
-#include "GL/wglext.h"  // wglext.h contains WGL extension interfaces
+#include "GL/wglext.h"  
 
 #include "opengl.cpp"
 
@@ -16,8 +23,6 @@
 static LARGE_INTEGER GlobalPerformanceFrequency = {};
 
 static bool GlobalAppRunning = false;
-
-static HMODULE OpenGL32DLL = nullptr;
 
 //
 // TODO:
@@ -383,9 +388,8 @@ LRESULT CALLBACK Win32WindowProc(HWND Window, UINT Message, WPARAM wParam, LPARA
     return Result;
 }
 
-void *Win32LoadOpenGLFunction(const char *Name)
+void *Win32LoadOpenGLFunction(HMODULE OpenGL32DLL, const char *Name)
 {
-    Assert(OpenGL32DLL);
     void *Result = (void *)wglGetProcAddress(Name);
     if (Result == 0 ||
         (Result == (void*)0x1) || (Result == (void*)0x2) || (Result == (void*)0x3) ||
@@ -396,6 +400,17 @@ void *Win32LoadOpenGLFunction(const char *Name)
     }
     
     return Result;
+}
+
+void Win32LoadOpenGLFunctions()
+{
+    HMODULE OpenGL32DLL = LoadLibraryA("opengl32.dll"); 
+    if (OpenGL32DLL)
+    {
+#define OpenGLFunction(Name, Type) gl##Name = (PFNGL##Type##PROC) Win32LoadOpenGLFunction(OpenGL32DLL, "gl"#Name);
+#include "opengl_functions.h"
+#undef OpenGLFunction
+    }
 }
 
 void SetSwapInterval(int Interval)
@@ -440,35 +455,39 @@ bool SetRealPixelFormat(HDC WindowDC, bool sRGBSupported)
 {
     bool Success = false;
     
-    int AttributeList[] = {
-        WGL_DRAW_TO_WINDOW_ARB,  GL_TRUE,
-        WGL_SUPPORT_OPENGL_ARB,  GL_TRUE,
-        WGL_DOUBLE_BUFFER_ARB,   GL_TRUE,
-        WGL_PIXEL_TYPE_ARB,      WGL_TYPE_RGBA_ARB,
-        WGL_ACCELERATION_ARB,    WGL_FULL_ACCELERATION_ARB,
-        WGL_FRAMEBUFFER_SRGB_CAPABLE_ARB, ((sRGBSupported) ? GL_TRUE : GL_FALSE),
-        WGL_COLOR_BITS_ARB,      24,  // DescribePixelFormat turns this to 32, but docs say it should be 32...
-        WGL_ALPHA_BITS_ARB,      8,
-        WGL_DEPTH_BITS_ARB,      24,
-        WGL_STENCIL_BITS_ARB,    8,
-        WGL_SAMPLE_BUFFERS_ARB,  1, // Minumum of 1 multisample buffers
-        WGL_SAMPLES_ARB,         4, // Number of samples per pixel
-        0 // Zero terminates list
-    };
-    
-    PFNWGLCHOOSEPIXELFORMATARBPROC wglChoosePixelFormatARB = (PFNWGLCHOOSEPIXELFORMATARBPROC) wglGetProcAddress("wglChoosePixelFormatARB");
-    if (wglChoosePixelFormatARB)
+    // Reqire sRGB support
+    if (sRGBSupported)
     {
-        int PixelFormatIndex = 0;
-        unsigned int FormatCount = 0;
-        if (wglChoosePixelFormatARB(WindowDC, AttributeList, NULL, 1, &PixelFormatIndex, &FormatCount))
+        int AttributeList[] = {
+            WGL_DRAW_TO_WINDOW_ARB,  GL_TRUE,
+            WGL_SUPPORT_OPENGL_ARB,  GL_TRUE,
+            WGL_DOUBLE_BUFFER_ARB,   GL_TRUE,
+            WGL_PIXEL_TYPE_ARB,      WGL_TYPE_RGBA_ARB,
+            WGL_ACCELERATION_ARB,    WGL_FULL_ACCELERATION_ARB,
+            WGL_FRAMEBUFFER_SRGB_CAPABLE_ARB, ((sRGBSupported) ? GL_TRUE : GL_FALSE),
+            WGL_COLOR_BITS_ARB,      24,  // DescribePixelFormat turns this to 32, but docs say it should be 24...
+            WGL_ALPHA_BITS_ARB,      8,
+            WGL_DEPTH_BITS_ARB,      24,
+            WGL_STENCIL_BITS_ARB,    8,
+            WGL_SAMPLE_BUFFERS_ARB,  1, // Minumum of 1 multisample buffers
+            WGL_SAMPLES_ARB,         4, // Number of samples per pixel
+            0 // Zero terminates list
+        };
+        
+        PFNWGLCHOOSEPIXELFORMATARBPROC wglChoosePixelFormatARB = (PFNWGLCHOOSEPIXELFORMATARBPROC) wglGetProcAddress("wglChoosePixelFormatARB");
+        if (wglChoosePixelFormatARB)
         {
-            PIXELFORMATDESCRIPTOR PixelFormat = {};
-            if (DescribePixelFormat(WindowDC, PixelFormatIndex, sizeof(PixelFormat), &PixelFormat))
+            int PixelFormatIndex = 0;
+            unsigned int FormatCount = 0;
+            if (wglChoosePixelFormatARB(WindowDC, AttributeList, NULL, 1, &PixelFormatIndex, &FormatCount))
             {
-                if (SetPixelFormat(WindowDC, PixelFormatIndex, &PixelFormat))
+                PIXELFORMATDESCRIPTOR PixelFormat = {};
+                if (DescribePixelFormat(WindowDC, PixelFormatIndex, sizeof(PixelFormat), &PixelFormat))
                 {
-                    Success = true;
+                    if (SetPixelFormat(WindowDC, PixelFormatIndex, &PixelFormat))
+                    {
+                        Success = true;
+                    }
                 }
             }
         }
@@ -477,10 +496,9 @@ bool SetRealPixelFormat(HDC WindowDC, bool sRGBSupported)
     return Success;
 }
 
-// The returned context may implement the version requested OR a greater version.
-// Query the actual version with glGetString.
 // If we can't create a modern context then we don't try to use a older context.
-// NOTE: This function is saying we will write both sRGB and non-sRGB code paths later
+// NOTE: sRGB framebuffers have been core since OpenGL 3.0. We should just error
+// if they are not supported, when write one code path.
 bool Win32CreateOpenGLContext(HDC WindowDC)
 {
     bool Success = false;
@@ -554,6 +572,8 @@ bool Win32CreateOpenGLContext(HDC WindowDC)
                             (PFNWGLCREATECONTEXTATTRIBSARBPROC) wglGetProcAddress("wglCreateContextAttribsARB");
                             if (wglCreateContextAttribsARB)
                             {
+                                // This may return a higher version that was requested, but it will never return
+                                // a version that does not implement the core features that your version implements.
                                 HGLRC WindowRC = wglCreateContextAttribsARB(WindowDC, 0, ContextAttributes);
                                 if (WindowRC)
                                 {
@@ -577,11 +597,16 @@ bool Win32CreateOpenGLContext(HDC WindowDC)
     return Success;
 }
 
-void Win32LoadOpenGLFunctions()
+v2s Win32GetWindowDim(HWND Window)
 {
-#define OpenGLFunction(Name, Type) gl##Name = (PFNGL##Type##PROC) Win32LoadOpenGLFunction("gl"#Name);
-#include "opengl_functions.h"
-#undef OpenGLFunction
+    RECT ClientDim = {};
+    GetClientRect(Window, &ClientDim);
+    v2s Result = {
+        ClientDim.right - ClientDim.left,
+        ClientDim.bottom - ClientDim.top
+    };
+    
+    return Result;
 }
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine, int nCmdShow)
@@ -593,12 +618,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
     
     Win32CreateConsole();
     
-    int WindowWidth = 1280;
-    int WindowHeight = 720;
-    
-    // TODO: DO we need to call AdjustWindowRect for correctly sized window because of border stuff?
-    // Create real window
-    // 
+    HWND Window = 0;
     
     WNDCLASSA WindowClass = {};
     WindowClass.style = CS_HREDRAW|CS_VREDRAW|CS_OWNDC;
@@ -609,62 +629,59 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
     WindowClass.lpszClassName = "MainWindowClass";
     if (RegisterClassA(&WindowClass))
     {
-        HWND Window = CreateWindowExA(0, 
-                                      WindowClass.lpszClassName,
-                                      "Base",
-                                      WS_OVERLAPPEDWINDOW,
-                                      CW_USEDEFAULT, CW_USEDEFAULT,
-                                      WindowWidth, WindowHeight,
-                                      NULL, NULL, 
-                                      hInstance, 
-                                      NULL);
+        int WindowWidth = 1280;
+        int WindowHeight = 1000;
+        
+        DWORD WindowStyle = WS_OVERLAPPEDWINDOW;
+        // Calculate the size of the window so our client area is what we actually want. 
+        // It seems like this may not consistantly work and we may need to different system for fullscreen.
+        RECT Rect = {0, 0, WindowWidth, WindowHeight};
+        AdjustWindowRect(&Rect, WindowStyle, false);
+        
+        int RequestedWindowWidth = Rect.right - Rect.left;
+        int RequestedWindowHeight = Rect.bottom - Rect.top;
+        
+        Window = CreateWindowExA(0, 
+                                 WindowClass.lpszClassName,
+                                 "Base",
+                                 WindowStyle,
+                                 CW_USEDEFAULT, CW_USEDEFAULT,
+                                 RequestedWindowWidth, RequestedWindowHeight,
+                                 NULL, NULL, 
+                                 hInstance, 
+                                 NULL);
         if (Window)
         {
             HDC WindowDC = GetDC(Window);
+            
             if (Win32CreateOpenGLContext(WindowDC))
             {
-                ShowWindow(Window, nCmdShow);
-                
-                OpenGL32DLL = LoadLibraryA("opengl32.dll"); 
-                if (OpenGL32DLL)
-                {
-                    SetSwapInterval(1);
-                    Win32LoadOpenGLFunctions();
-                }
+                SetSwapInterval(1);
+                Win32LoadOpenGLFunctions();
             }
             
             ReleaseDC(Window, WindowDC);
         }
     }
     
-    RunTests();
+    
+    //RunTests();
+    
+    ShowWindow(Window, nCmdShow);
     
     InitOpenGL();
     
     GlobalAppRunning = true;
     while (GlobalAppRunning)
     {
-        MSG Message = {};
-        while (true)
-        {
-            if (PeekMessage(&Message, NULL, NULL, NULL, PM_REMOVE))
-            {
-                TranslateMessage(&Message);
-                DispatchMessageA(&Message);
-            }
-            else
-            {
-                break;
-            }
-        }
         
-        OpenGLEndFrame(WindowWidth, WindowHeight);
+        v2s WindowDim = Win32GetWindowDim(Window);
+        OpenGLBeginFrame();
+        
+        OpenGLEndFrame(WindowDim.Width, WindowDim.Height);
         
         SwapBuffers(wglGetCurrentDC());
     }
-    
-    
-    
     
     return 0;
 }

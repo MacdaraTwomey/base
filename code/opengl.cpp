@@ -1,5 +1,5 @@
 
-// Might need to #define GL_GLEXT_PROTOTYPES to get function prototypes
+// Might can #define GL_GLEXT_PROTOTYPES to get function prototypes
 #include "GL/glcorearb.h"
 
 // There is no function prototype for each  OpenGL function, only the global variable defined here.
@@ -7,6 +7,13 @@
 #define OpenGLFunction(Name, Type) PFNGL##Type##PROC gl##Name = nullptr;
 #include "opengl_functions.h"
 #undef OpenGLFunction
+
+struct vertex
+{
+    v2 P;
+    v2 UV;
+    u32 Colour;
+};
 
 GLuint CreateShader(GLenum Type, const char *ShaderSource)
 {
@@ -37,10 +44,13 @@ GLuint CreateProgram()
 uniform mat4x4 Transform;
 
     in vec2 VertP;
+in vec2 VertUV;
     in vec4 VertColour;
+out vec2 FragUV;
 out vec4 FragColour;
         
     void main() {
+FragUV = VertUV;
 FragColour = VertColour; 
     gl_Position = Transform * vec4(VertP, 0.0, 1.0);
     }
@@ -50,11 +60,14 @@ FragColour = VertColour;
     const char *FragmentShaderSource = R"BAR(
     #version 330 core
 
+uniform sampler2D Texture;
+
+in vec2 FragUV;
 in vec4 FragColour;
     out vec4 OutColour;
         
     void main() {
- OutColour = FragColour;
+ OutColour = FragColour * texture(Texture, FragUV); 
     }
 
     )BAR";
@@ -67,7 +80,7 @@ in vec4 FragColour;
     glAttachShader(Program, FragmentShader);
     glLinkProgram(Program);
     
-    // TODO: Not sure if this is useful
+    // This information may already appear in glDebugMessageCallback
     glValidateProgram(Program);
     
     int Success;
@@ -140,16 +153,6 @@ void OpenGLDebugOutput(GLenum Source, GLenum Type, unsigned int ID, GLenum Sever
     printf("---------------\n");
 }
 
-struct vertex
-{
-    v2 P;
-    u32 Colour;
-};
-
-GLuint GlobalVAO = 0;
-GLuint GlobalVBO = 0;
-GLint GlobalTransformUniform = 0;
-
 void InitOpenGL()
 {
     GLint Flags; 
@@ -160,8 +163,10 @@ void InitOpenGL()
         GLint Minor = 0;
         glGetIntegerv(GL_MAJOR_VERSION, &Major);
         glGetIntegerv(GL_MINOR_VERSION, &Minor);
-        if (Major > 4 || (Major >= 4 && Minor >= 3))
+        //if (Major > 4 || (Major >= 4 && Minor >= 3))
         {
+            // NOTE: We can call this even with a OpenGL 3.2 context (which is convinient) 
+            // on my machine but this can't be relied 
             glEnable(GL_DEBUG_OUTPUT);
             glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
             glDebugMessageCallback(OpenGLDebugOutput, nullptr);
@@ -184,37 +189,23 @@ void InitOpenGL()
     glEnableVertexAttribArray(VertexPositionIndex);
     glVertexAttribPointer(VertexPositionIndex, 2, GL_FLOAT, GL_FALSE, sizeof(vertex), (void *)offsetof(vertex, P));
     
+    s32 VertexUVIndex = glGetAttribLocation(Program, "VertUV");
+    glEnableVertexAttribArray(VertexUVIndex);
+    glVertexAttribPointer(VertexUVIndex, 2, GL_FLOAT, GL_FALSE, sizeof(vertex), (void *)offsetof(vertex, UV));
+    
     // We are giving shader a u32 which is 4 unsigned bytes, each of which will be normalised to [0.0-1.0]
     GLint VertexColourIndex = glGetAttribLocation(Program, "VertColour");
     glEnableVertexAttribArray(VertexColourIndex);
     glVertexAttribPointer(VertexColourIndex, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(vertex), (void *)offsetof(vertex, Colour));
     
-    // Is there a benefit to matching attrib position in buffer with attrib layout in shader
-    printf("VertP Index = %i\n", VertexPositionIndex);
-    printf("VertColour Index = %i\n", VertexColourIndex);
-    
     s32 TransformUniformLocation = glGetUniformLocation(Program, "Transform");
     
-    v3 ClearColour = V3(1.0f, 0.0f, 1.0f);
+    v3 ClearColour = V3(0.5f, 0.5f, 0.5f);
     glClearColor(ClearColour.r, ClearColour.g, ClearColour.b, 1.0f);
-    //glEnable(GL_FRAMEBUFFER_SRGB); // output of fragment shader is gamma corrected pow(1/2.2)
+    //glEnable(GL_FRAMEBUFFER_SRGB); 
     
-    GlobalVAO = VAO;
-    GlobalVBO = VBO;
-    GlobalTransformUniform = TransformUniformLocation;
-}
-
-
-// TODO: REMOVE
-inline u32
-RGBAPack4x8(v4 Unpacked)
-{
-    u32 result = (((u32)roundf(Unpacked.a) << 24) |
-                  ((u32)roundf(Unpacked.b) << 16) |
-                  ((u32)roundf(Unpacked.g) << 8) |
-                  ((u32)roundf(Unpacked.r) << 0));
-    
-    return result;
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);  
 }
 
 void OpenGLBeginFrame()
@@ -225,39 +216,4 @@ void OpenGLBeginFrame()
 void OpenGLEndFrame(s32 WindowWidth, s32 WindowHeight)
 {
     
-    vertex Vert0 = vertex{V2(0, 0), RGBAPack4x8(V4(1.0f, 0.0f, 0.0f, 1.0f) * 255.0f)};
-    vertex Vert1 = vertex{V2((f32)WindowWidth, 0), RGBAPack4x8(V4(0.0f, 1.0f, 0.0f, 1.0f) * 255.0f)};
-    vertex Vert2 = vertex{V2((f32)WindowWidth, (f32)WindowHeight), RGBAPack4x8(V4(0.0f, 0.0f, 1.0f, 1.0f) * 255.0f)};
-    vertex Vert3 = vertex{V2(0, (f32)WindowHeight), RGBAPack4x8(V4(8.0f, 3.0f, 4.0f, 1.0f) * 255.0f)};
-    
-    f32 Dim = 100;
-    f32 CentreX = WindowWidth / 2.0f;
-    f32 CentreY = WindowHeight / 2.0f;
-    
-    vertex VertA0 = vertex{V2(CentreX - Dim, CentreY - Dim), RGBAPack4x8(V4(0.0f, 0.0f, 0.0f, 1.0f) * 255.0f)};
-    vertex VertA1 = vertex{V2(CentreX + Dim, CentreY - Dim), RGBAPack4x8(V4(0.0f, 0.0f, 0.0f, 1.0f) * 255.0f)};
-    vertex VertA2 = vertex{V2(CentreX + Dim, CentreY + Dim), RGBAPack4x8(V4(0.0f, 0.0f, 0.0f, 1.0f) * 255.0f)};
-    vertex VertA3 = vertex{V2(CentreX - Dim, CentreY + Dim), RGBAPack4x8(V4(0.0f, 0.0f, 0.0f, 1.0f) * 255.0f)};
-    
-    vertex VertexArray[] = {
-        Vert0, Vert2, Vert3,
-        Vert0, Vert1, Vert2,
-        
-        VertA0, VertA2, VertA3,
-        VertA0, VertA1, VertA2,
-    };
-    
-    glBindBuffer(GL_ARRAY_BUFFER, GlobalVBO);
-    glBufferData(GL_ARRAY_BUFFER, ArrayCount(VertexArray) * sizeof(vertex), VertexArray, GL_DYNAMIC_DRAW);
-    
-    Assert(WindowWidth > 0 && WindowHeight > 0);
-    m4x4 VertexTransform = OrthographicProjection2D(0, (f32)WindowWidth, 0, (f32)WindowHeight);
-    
-    glUniformMatrix4fv(GlobalTransformUniform, 1, GL_TRUE, &VertexTransform.E[0][0]);
-    
-    glViewport(0, 0, WindowWidth, WindowHeight);
-    
-    glClear(GL_COLOR_BUFFER_BIT);
-    
-    glDrawArrays(GL_TRIANGLES, 0, (GLsizei)ArrayCount(VertexArray));
 }

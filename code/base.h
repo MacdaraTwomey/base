@@ -376,6 +376,13 @@ union v2
     f32 E[2];
 };
 
+struct v2s
+{
+    struct { s32 x, y; };
+    struct { s32 Width, Height; };
+    f32 E[2];
+};
+
 union v3
 {
     struct { f32 x, y, z; };
@@ -409,19 +416,19 @@ union v4
     struct
     {
         v2 xy;
-        f32 Ignored0_;
-        f32 Ignored1_;
+        f32 Unused0_;
+        f32 Unused1_;
     };
     struct
     {
-        f32 Ignored2_;
+        f32 Unused2_;
         v2 yz;
-        f32 Ignored3_;
+        f32 Unused3_;
     };
     struct
     {
-        f32 Ignored4_;
-        f32 Ignored5_;
+        f32 Unused4_;
+        f32 Unused5_;
         v2 zw;
     };
     f32 E[4];
