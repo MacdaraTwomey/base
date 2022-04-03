@@ -1,4 +1,6 @@
 
+#define _USE_MATH_DEFINES
+#include <math.h>
 
 // Returns non-null terminated string
 string UTF8FromUTF16(arena *Arena, wchar_t *String16, u32 String16Length);
@@ -493,5 +495,12 @@ void RunTests()
         static_assert(U16Max == UINT16_MAX, "");
         static_assert(U32Max == UINT32_MAX, "");
         static_assert(U64Max == UINT64_MAX, "");
+        
+        static_assert(F32Max == FLT_MAX, "");
+        static_assert(F32Min == -FLT_MAX, "");
+        static_assert(F64Max == DBL_MAX, "");
+        static_assert(F64Min == -DBL_MAX, "");
+        
+        static_assert(Pi32 == (f32)M_PI, "Pi32 not equal to M_PI");
     }
 }

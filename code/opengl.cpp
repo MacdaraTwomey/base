@@ -2,12 +2,6 @@
 // Might can #define GL_GLEXT_PROTOTYPES to get function prototypes
 #include "GL/glcorearb.h"
 
-// There is no function prototype for each  OpenGL function, only the global variable defined here.
-// function prototype names collide with the global variables.
-#define OpenGLFunction(Name, Type) PFNGL##Type##PROC gl##Name = nullptr;
-#include "opengl_functions.h"
-#undef OpenGLFunction
-
 struct vertex
 {
     v2 P;
@@ -163,10 +157,12 @@ void InitOpenGL()
         GLint Minor = 0;
         glGetIntegerv(GL_MAJOR_VERSION, &Major);
         glGetIntegerv(GL_MINOR_VERSION, &Minor);
+        
+        // NOTE: We can call this even with a OpenGL 3.2 context on my machine (which is convinient) 
+        // but this can't be relied on.
+        
         //if (Major > 4 || (Major >= 4 && Minor >= 3))
         {
-            // NOTE: We can call this even with a OpenGL 3.2 context (which is convinient) 
-            // on my machine but this can't be relied 
             glEnable(GL_DEBUG_OUTPUT);
             glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
             glDebugMessageCallback(OpenGLDebugOutput, nullptr);

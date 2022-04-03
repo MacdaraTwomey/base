@@ -3,7 +3,7 @@
 
 set SourceFiles=..\code\win32.cpp
 
-set IncludeDirs=..\deps
+set IncludeDirs=-I..\deps
 
 set LinkedLibraries=-lopengl32.lib -lgdi32.lib -luser32.lib
 
@@ -16,6 +16,7 @@ pushd build
 :: -Wno-gnu-anonymous-struct -Wno-nested-anon-types  for allowing anonymous structs for  v2, v3, v4
 :: -Wno-gnu-zero-variadic-macro-arguments  to allow ## before __VA_ARGS__ to eat comma 
 :: -Wno-unused-function  warning me about operator* in header file for m4x4
+
 
 clang++  c:\dev\projects\base\code\win32.cpp -Wall  -pedantic-errors -std=c++14 -Wno-unused-variable -Wno-gnu-anonymous-struct -Wno-nested-anon-types -Wno-gnu-zero-variadic-macro-arguments -Wno-missing-braces -fno-strict-aliasing -Wno-unused-function -g -o base_test.exe %IncludeDirs% %LinkedLibraries%
 

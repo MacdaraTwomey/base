@@ -11,7 +11,7 @@
 //
 
 // TODO: Make thread local
-// TODO: Do we wan't a pool of possible scratch arenas
+// TODO: Do we want a pool of possible scratch arenas
 static arena *GlobalScratchArena_ = nullptr;
 
 #define ARENA_HEADER_SIZE 64

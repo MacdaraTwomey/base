@@ -242,8 +242,6 @@ void        CheckArena(arena *Arena);
 temp_memory GetScratch();
 void        ReleaseScratch(temp_memory ScratchMemory);
 
-// TODO: Not sure if I prefer default to clear to zero or not
-
 // ## __VA_ARGS is an extension on gcc and clang, and the MSVC preprocessor will eat trailing commas when 
 // VA_ARGS is empty. But this will generate warnings with pedantic error checking.
 //#define PushArray(Arena, Count, Type, ...) (Type *)PushSize_((Arena), (Count)*sizeof(Type), alignof(Type), ##__VA_ARGS__)
@@ -252,8 +250,6 @@ void        ReleaseScratch(temp_memory ScratchMemory);
 #define PushArray(Arena, Count, Type) (Type *)PushSize_((Arena), (Count)*sizeof(Type), alignof(Type), NoClear())
 #define PushArrayZero(Arena, Count, Type) (Type *)PushSize_((Arena), (Count)*sizeof(Type), alignof(Type), ClearToZero())
 #define PushStruct(Arena, Type) (Type *)PushSize_((Arena), sizeof(Type), alignof(Type), ClearToZero())
-
-
 
 ///////////////////////////////////////////////////////////////////////
 // String
@@ -361,7 +357,9 @@ constexpr u32 U32Max = 0xFFFFFFFF;
 constexpr u64 U64Max = 0xFFFFFFFFFFFFFFFF;
 
 constexpr f32 F32Max = FLT_MAX;
-constexpr f32 F32Min = -FLT_MAX;
+constexpr f32 F32Min = -FLT_MAX;  // smallest negative number != FLT_MIN 
+constexpr f64 F64Max = DBL_MAX;
+constexpr f64 F64Min = -DBL_MAX; 
 constexpr f32 Pi32   = 3.14159265359f;
 constexpr f32 Tau32  = 6.28318530717958647692f;
 
