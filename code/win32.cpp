@@ -400,7 +400,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
     HWND Window = 0;
     
     WNDCLASSA WindowClass = {};
-    WindowClass.style = CS_HREDRAW|CS_VREDRAW|CS_OWNDC;
+    WindowClass.style = CS_HREDRAW|CS_VREDRAW|CS_OWNDC;  
     WindowClass.lpfnWndProc = Win32WindowProc;
     WindowClass.hInstance = hInstance;
     WindowClass.hCursor = LoadCursor(NULL, IDC_ARROW);
@@ -447,7 +447,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
                     
                     OpenGLEndFrame(WindowDim.Width, WindowDim.Height);
                     
-                    SwapBuffers(wglGetCurrentDC());
+                    SwapBuffers(WindowDC);
                 }
                 
             }
