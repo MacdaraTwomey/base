@@ -20,7 +20,9 @@ load_paths = {
 };
 
 commands = {
-    .build_clang = { .out = "*compilation*", .footer_panel = true, .save_dirty_files = true,
+    // .cursor_at_end = false is an option
+
+    .build_clang = { .out = "*compilation*", .footer_panel = true, .save_dirty_files = true,         
         .win = "bash build_clang.sh"},
     
     .build_msvc = { .out = "*compilation*", .footer_panel = true, .save_dirty_files = true,
