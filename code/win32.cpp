@@ -388,15 +388,20 @@ v2s Win32GetWindowDim(HWND Window)
     return Result;
 }
 
+#define IS_CONSOLE 1
+
+#if IS_CONSOLE
+int main(int ArgCount, char *Args[]) {
+    RunTests();
+#else
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine, int nCmdShow)
 {
+    Win32CreateConsole();
     (void)hInstance;
     (void)hPrevInstance;
     (void)pCmdLine;
     (void)nCmdShow;
-    
-    Win32CreateConsole();
-    
+
     HWND Window = 0;
     
     WNDCLASSA WindowClass = {};
@@ -434,7 +439,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
             HDC WindowDC = GetDC(Window);
             if (Win32InitOpenGL(WindowDC))
             {
-                //RunTests();
                 ShowWindow(Window, nCmdShow);
                 
                 InitOpenGL();
@@ -455,5 +459,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
             ReleaseDC(Window, WindowDC);
         }
     }
+#endif
+
 }
 

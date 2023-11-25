@@ -22,7 +22,7 @@ GLuint CreateShader(GLenum Type, const char *ShaderSource)
         char InfoLog[2048];
         glGetShaderInfoLog(Shader, sizeof(InfoLog), nullptr, InfoLog);
         printf("ERROR: Could not compile %s shader\n", (Type == GL_VERTEX_SHADER) ? "Vertex" : "Fragment");
-        printf(InfoLog);
+        printf("%s", InfoLog);
         Assert(0);
     }
     
@@ -84,7 +84,7 @@ in vec4 FragColour;
         char InfoLog[2048];
         glGetProgramInfoLog(Program, sizeof(InfoLog), nullptr, InfoLog);
         printf("ERROR: Could not link shader program\n");
-        printf(InfoLog);
+        printf("%s", InfoLog);
         Assert(0);
     }
     

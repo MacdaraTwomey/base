@@ -68,6 +68,7 @@ struct test
 
 void RunTests()
 {
+    printf("Running tests...\n");
 #if 0
     {
         arena *Arena = CreateArena(GB(1));
@@ -310,7 +311,7 @@ void RunTests()
         Assert(!StringContainsSubstr(StringLit("abc"), StringLit("")));
         
         //                                               01234567890123456789
-        u64 SlashIndex1 = StringFindLastSlash(StringLit("c:/dev/test/file.exe"));
+        u64 SlashIndex1 = StringFindLastSlash(StringLit("C:/dev/test/file.exe"));
         Assert(SlashIndex1 == 11);
         
         string FileExe = StringLit("file.exe");
@@ -336,8 +337,8 @@ void RunTests()
         Assert(StringsAreEqual(Test, StringLit("test"))); 
         Assert(StringsAreEqual(Dot, StringLit(""))); 
         
-        Assert(StringsAreEqual(StringLit("file.exe"), FilenameFromPath(StringLit("c:/dev/test/file.exe")))); 
-        Assert(StringsAreEqual(StringLit("file.exe"), FilenameFromPath(StringLit("c://dev/test////file.exe")))); 
+        Assert(StringsAreEqual(StringLit("file.exe"), FilenameFromPath(StringLit("C:/dev/test/file.exe")))); 
+        Assert(StringsAreEqual(StringLit("file.exe"), FilenameFromPath(StringLit("C://dev/test////file.exe")))); 
         Assert(StringsAreEqual(StringLit("file.exe"), FilenameFromPath(StringLit("/c/dev/test/file.exe")))); 
         Assert(StringsAreEqual(StringLit("file"), FilenameFromPath(StringLit("/c/dev/test/file")))); 
         Assert(StringsAreEqual(StringLit("file"), FilenameFromPath(StringLit("/c/.dev/test //file")))); 
@@ -345,10 +346,10 @@ void RunTests()
         Assert(StringsAreEqual(StringLit(""), FilenameFromPath(StringLit("file")))); 
         Assert(StringsAreEqual(StringLit(""), FilenameFromPath(StringLit("/")))); 
         Assert(StringsAreEqual(StringLit("c"), FilenameFromPath(StringLit("/c")))); 
-        Assert(StringsAreEqual(StringLit("elmo.doc"), FilenameFromPath(StringLit("c:/abc\\def//hjkl\\\\sdfsdf/elmo.doc")))); 
+        Assert(StringsAreEqual(StringLit("elmo.doc"), FilenameFromPath(StringLit("C:/abc\\def//hjkl\\\\sdfsdf/elmo.doc")))); 
         
-        Assert(StringsAreEqual(StringLit("c:/dev/test/"), DirectoryFromPath(StringLit("c:/dev/test/file.exe")))); 
-        Assert(StringsAreEqual(StringLit("c://dev/test////"), DirectoryFromPath(StringLit("c://dev/test////file.exe")))); 
+        Assert(StringsAreEqual(StringLit("C:/dev/test/"), DirectoryFromPath(StringLit("C:/dev/test/file.exe")))); 
+        Assert(StringsAreEqual(StringLit("C://dev/test////"), DirectoryFromPath(StringLit("C://dev/test////file.exe")))); 
         Assert(StringsAreEqual(StringLit("/c/dev/test/"), DirectoryFromPath(StringLit("/c/dev/test/file.exe")))); 
         Assert(StringsAreEqual(StringLit("/c/dev/test/"), DirectoryFromPath(StringLit("/c/dev/test/file")))); 
         Assert(StringsAreEqual(StringLit("/c/.dev/test //"), DirectoryFromPath(StringLit("/c/.dev/test //file")))); 
@@ -356,7 +357,7 @@ void RunTests()
         Assert(StringsAreEqual(StringLit(""), DirectoryFromPath(StringLit("file")))); 
         Assert(StringsAreEqual(StringLit("/"), DirectoryFromPath(StringLit("/")))); 
         Assert(StringsAreEqual(StringLit("/"), DirectoryFromPath(StringLit("/c")))); 
-        Assert(StringsAreEqual(StringLit("c:/abc\\def//hjkl\\\\sdfsdf/"), DirectoryFromPath(StringLit("c:/abc\\def//hjkl\\\\sdfsdf/elmo.doc")))); 
+        Assert(StringsAreEqual(StringLit("C:/abc\\def//hjkl\\\\sdfsdf/"), DirectoryFromPath(StringLit("C:/abc\\def//hjkl\\\\sdfsdf/elmo.doc")))); 
         
         temp_memory Scratch = GetScratch();
         
@@ -423,20 +424,18 @@ void RunTests()
         (void)String16;
         
         string ExePath = PlatformGetExecutablePath(Arena);
-        Assert(StringsAreEqual(ExePath, StringLit("c:\\dev\\projects\\base\\build\\base_test.exe")));
+        Assert(StringsAreEqual(ExePath, StringLit("C:\\dev\\projects\\base\\build\\base_test.exe")));
         
-        Assert(PlatformFileExists(StringLit("c:/dev/projects/base/build/test.md")));
-        Assert(PlatformFileExists(StringLit("c:/dev/projects/base/build/base_test.exe")));
-        Assert(PlatformFileExists(StringLit("c:\\dev\\projects\\base\\build\\base_test.exe")));
-        Assert(PlatformFileExists(StringLit("c:\\dev\\projects\\base\\build\\BASE_TEST.EXE")));
-        Assert(!PlatformFileExists(StringLit("c:\\dev\\projects\\base\\build\\")));
-        Assert(!PlatformFileExists(StringLit("c:\\dev\\projects\\base\\build")));
-        Assert(!PlatformFileExists(StringLit("c:\\fake\\fakey")));
+        Assert(PlatformFileExists(StringLit("C:/dev/projects/base/build/base_test.exe")));
+        Assert(PlatformFileExists(StringLit("C:\\dev\\projects\\base\\build\\base_test.exe")));
+        Assert(PlatformFileExists(StringLit("C:\\dev\\projects\\base\\build\\BASE_TEST.EXE")));
+        Assert(!PlatformFileExists(StringLit("C:\\dev\\projects\\base\\build\\")));
+        Assert(!PlatformFileExists(StringLit("C:\\dev\\projects\\base\\build")));
+        Assert(!PlatformFileExists(StringLit("C:\\fake\\fakey")));
         
-        
-        Assert(PlatformGetFileSize(StringLit("c:\\dev\\projects\\base\\build\\test.md")) == 815);
-        
-        platform_file_contents File = PlatformReadEntireFile(Arena, StringLit("test.md"));
+        Assert(PlatformFileExists(StringLit("C:/dev/projects/base/test/file1.txt")));
+        Assert(PlatformGetFileSize(StringLit("C:/dev/projects/base/test/file1.txt")) == 94);        
+        platform_file_contents File = PlatformReadEntireFile(Arena, StringLit("C:/dev/projects/base/test/file1.txt"));
         
 #if 0
         u64 TotalSize = GB(5);
@@ -461,13 +460,13 @@ void RunTests()
         
         u64 Data[] = { 0x3234234, 0x23423423, 0x0349538450, 0x93213, 0x34882349 };
         Assert(PlatformWriteEntireFile(sizeof(Data), (u8 *)Data,
-                                       StringLit("c:/dev/projects/base/build/writefile.test")));
+                                       StringLit("C:/dev/projects/base/build/writefile.test")));
         
-        platform_file_contents RoundTripFile = PlatformReadEntireFile(Arena, StringLit("c:/dev/projects/base/build/writefile.test"));
+        platform_file_contents RoundTripFile = PlatformReadEntireFile(Arena, StringLit("C:/dev/projects/base/build/writefile.test"));
         Assert(RoundTripFile.Size == sizeof(Data));
         Assert(memcmp(Data, RoundTripFile.Contents, sizeof(Data)) == 0);
         
-        Assert(PlatformDeleteFile(StringLit("c:/dev/projects/base/build/writefile.test")));
+        Assert(PlatformDeleteFile(StringLit("C:/dev/projects/base/build/writefile.test")));
         
         FreeArena(Arena);
     }

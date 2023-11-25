@@ -5,8 +5,7 @@ project_name = "base";
 patterns = {
     "*.cpp",
     "*.h",
-    "*build.bat",
-    "*build_clang.bat",
+    "*build*",
     "*.4coder",
 };
 //blacklist_patterns = {
