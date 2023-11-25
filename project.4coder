@@ -5,7 +5,7 @@ project_name = "base";
 patterns = {
     "*.cpp",
     "*.h",
-    "*build*",
+    "build*",
     "*.4coder",
 };
 //blacklist_patterns = {
@@ -20,20 +20,21 @@ load_paths = {
 };
 
 commands = {
-    .build = { .out = "*compilation*", .footer_panel = true, .save_dirty_files = true,
-        .win = "build.bat"},
+    .build_clang = { .out = "*compilation*", .footer_panel = true, .save_dirty_files = true,
+        .win = "bash build_clang.sh"},
     
+    .build_msvc = { .out = "*compilation*", .footer_panel = true, .save_dirty_files = true,
+        .win = "bash build_msvc.sh"},
+
     .run = { .out = "*run*", .footer_panel = true, .save_dirty_files = false,
         .win = "build\base_test.exe"},
     
     .buildrun = { .out = "*compilation*", .footer_panel = true, .save_dirty_files = true,
-        .win = "build_and_run.bat"},
-    
-    .build_clang = { .out = "*compilation*", .footer_panel = true, .save_dirty_files = true,
-        .win = "build_clang.bat"},
+        .win = "bash build_and_run.sh"},
 };
 fkey_command = {
-    .F1 = "build",
+    // Alt-m seems to run the F1 command
+    .F1 = "build_msvc",
     .F2 = "run",
     .F3 = "buildrun",
     .F4 = "build_clang",
