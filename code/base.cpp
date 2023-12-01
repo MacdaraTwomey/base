@@ -88,12 +88,12 @@ arena *CreateArena(u64 ReserveSize)
             Arena->Base = (u8 *)Memory;
             Arena->Pos = ARENA_HEADER_SIZE;
             Arena->Commit = CommitSize;
-            Arena->Reserve = ReserveSize;
+            Arena->Reserve = AlignedReserveSize;
             Arena->TempCount = 0;
         }
         else
         {
-            PlatformMemoryFree(Memory);
+            PlatformMemoryFree(Memory, AlignedReserveSize);
         }
     }
     
@@ -104,7 +104,7 @@ arena *CreateArena(u64 ReserveSize)
 
 void FreeArena(arena *Arena)
 {
-    PlatformMemoryFree(Arena->Base);
+    PlatformMemoryFree(Arena->Base, Arena->Reserve);
 }
 
 void *PushSize_(arena *Arena, u64 Size, u32 Alignment, u32 ArenaPushFlags)
@@ -325,7 +325,7 @@ u8 *PushCString(arena *Arena, u8 *String)
 
 u8 *PushCString(arena *Arena, string String)
 {
-    u8 *StringZ  = PushArray(&Scratch, String.Length + 1, u8);
+    u8 *StringZ  = PushArray(Arena, String.Length + 1, u8);
     MemoryCopy(String.Length, String.Str, StringZ);
     StringZ[String.Length] = 0;
     return StringZ;

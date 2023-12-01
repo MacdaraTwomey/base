@@ -1,11 +1,13 @@
 
+#include "platform.h"
 #include "base.h"
 #include "base.cpp"
 
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <fcntl>
+#include <sys/mman.h>
+#include <fcntl.h>
 
 bool PlatformFileExists(string FilePath)
 {
@@ -139,12 +141,64 @@ bool PlatformDeleteFile(string FilePath)
 // Memory
 //
 
-void *  PlatformMemoryReserve(u64 Size);
-bool    PlatformMemoryCommit(void *Address, u64 size);
-void    PlatformMemoryDecommit(void *Address, u64 Size);
-void    PlatformMemoryFree(void *Address);
-void    PlatformMemoryGuard(void *Address, u64 Size);
-void    PlatformMemoryRemoveGuard(void *Address, u64 Size);
+void *PlatformMemoryReserve(u64 Size)
+{
+    Assert(Size > 0);
+    Assert(sysconf(_SC_PAGE_SIZE) == 4096);
+    
+    void *Memory = mmap(0, 0, PROT_READ|PPROT_WRITE, MAP_ANONYMOUS, -1, 0);
+    if (Memory == MAP_FAILED)
+    {
+        Memory = 0;
+    }
+    
+    return Memory;
+}
+
+bool PlatformMemoryCommit(void *Address, u64 Size)
+{
+    Assert(Address);
+    Assert(Size > 0);
+    MemoryZero(Address, Size);
+    return true; 
+}
+
+void PlatformMemoryDecommit(void *Address, u64 Size)
+{
+    Assert(Address);
+    Assert(Size > 0);
+    
+    // MADV_DONTNEED
+    // Do not expect access in the near future. (For the time being, the application is finished with the given range, so the kernel can free resources associated with it.) Subsequent accesses of pages in this range will succeed, but will result either in reloading of the memory contents from the underlying mapped file (see mmap(2)) or zero-fill-on-demand pages for mappings without an underlying file. 
+    madvise(Address, Size, MADV_DONTNEED); 
+}
+
+void PlatformMemoryFree(void *Address, u64 Size)
+{
+    Assert(Address);
+    Assert(Size > 0);
+    munmap(Address, Size);
+}
+
+void PlatformMemoryGuard(void *Address, u64 Size)
+{
+    Assert(Address);
+    Assert(Size > 0);
+    Assert(((uintptr_t)Address & (4096 - 1)) == 0);
+    Assert((Size & (4096 - 1)) == 0);
+    
+    mprotect(Address, Size, PROT_NONE);
+}
+
+void PlatformMemoryRemoveGuard(void *Address, u64 Size)
+{
+    Assert(Address);
+    Assert(Size > 0);
+    Assert(((uintptr_t)Address & (4096 - 1)) == 0);
+    Assert((Size & (4096 - 1)) == 0);
+    
+    mprotect(Address, Size, PROT_NONE);
+}
 
 
 int main(int ArgCount, char *Args[]) 

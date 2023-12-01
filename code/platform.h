@@ -31,6 +31,10 @@ bool                   PlatformDeleteFile(string FilePath);
 void *  PlatformMemoryReserve(u64 Size);
 bool    PlatformMemoryCommit(void *Address, u64 size);
 void    PlatformMemoryDecommit(void *Address, u64 Size);
-void    PlatformMemoryFree(void *Address);
+
+// Size must match the original reserved Size. 
+// On Windows Size is not used, the entire allocation is freed. 
+// On Linux Size is used to determine how many pages to free.
+void    PlatformMemoryFree(void *Address, u64 Size);
 void    PlatformMemoryGuard(void *Address, u64 Size);
 void    PlatformMemoryRemoveGuard(void *Address, u64 Size);

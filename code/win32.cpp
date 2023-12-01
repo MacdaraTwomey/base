@@ -261,6 +261,7 @@ bool PlatformWriteEntireFile(u64 Size, u8 *Contents, string FilePath)
     return Success;
 }
 
+// TODO: Handle deleteing directories
 bool PlatformDeleteFile(string FilePath)
 {
     temp_memory Scratch = GetScratch();
@@ -302,7 +303,7 @@ void PlatformMemoryDecommit(void *Address, u64 Size)
     Assert(Success);
 }
 
-void PlatformMemoryFree(void *Address)
+void PlatformMemoryFree(void *Address, u64)
 {
     // Decommits all commited pages and releases reserved memory region
     Assert(Address);
@@ -312,12 +313,9 @@ void PlatformMemoryFree(void *Address)
 
 void PlatformMemoryGuard(void *Address, u64 Size)
 {
-    // Only for debug builds
-    
-    // Undefined behaviour 
     Assert(Address);
-    u64 AddressInt = (u64)Address;
-    Assert((AddressInt & (4096 - 1)) == 0);
+    Assert(Size > 0);
+    Assert(((uintptr_t)Address & (4096 - 1)) == 0);
     Assert((Size & (4096 - 1)) == 0);
     
     // We aren't using PAGE_GUARD as that throws an exception, then reverts to the old protection.
@@ -329,12 +327,9 @@ void PlatformMemoryGuard(void *Address, u64 Size)
 
 void PlatformMemoryRemoveGuard(void *Address, u64 Size)
 {
-    // Only for debug builds
-    
-    // Undefined behaviour 
     Assert(Address);
-    u64 AddressInt = (u64)Address;
-    Assert((AddressInt & (4096 - 1)) == 0);
+    Assert(Size > 0);
+    Assert(((uintptr_t)Address & (4096 - 1)) == 0);
     Assert((Size & (4096 - 1)) == 0);
     
     DWORD OldProtectFlags;
@@ -394,72 +389,73 @@ v2s Win32GetWindowDim(HWND Window)
 int main(int ArgCount, char *Args[]) {
     RunTests();
 #else
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine, int nCmdShow)
-{
-    Win32CreateConsole();
-    (void)hInstance;
-    (void)hPrevInstance;
-    (void)pCmdLine;
-    (void)nCmdShow;
-
-    HWND Window = 0;
-    
-    WNDCLASSA WindowClass = {};
-    WindowClass.style = CS_HREDRAW|CS_VREDRAW|CS_OWNDC;  
-    WindowClass.lpfnWndProc = Win32WindowProc;
-    WindowClass.hInstance = hInstance;
-    WindowClass.hCursor = LoadCursor(NULL, IDC_ARROW);
-    WindowClass.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH); 
-    WindowClass.lpszClassName = "MainWindowClass";
-    if (RegisterClassA(&WindowClass))
+    int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine, int nCmdShow)
     {
-        int WindowWidth = 1280;
-        int WindowHeight = 1000;
+        Win32CreateConsole();
+        (void)hInstance;
+        (void)hPrevInstance;
+        (void)pCmdLine;
+        (void)nCmdShow;
         
-        DWORD WindowStyle = WS_OVERLAPPEDWINDOW;
-        // Calculate the size of the window so our client area is what we actually want. 
-        // It seems like this may not consistantly work and we may need to different system for fullscreen.
-        RECT Rect = {0, 0, WindowWidth, WindowHeight};
-        AdjustWindowRect(&Rect, WindowStyle, false);
+        HWND Window = 0;
         
-        int RequestedWindowWidth = Rect.right - Rect.left;
-        int RequestedWindowHeight = Rect.bottom - Rect.top;
-        
-        Window = CreateWindowExA(0, 
-                                 WindowClass.lpszClassName,
-                                 "Base",
-                                 WindowStyle,
-                                 CW_USEDEFAULT, CW_USEDEFAULT,
-                                 RequestedWindowWidth, RequestedWindowHeight,
-                                 NULL, NULL, 
-                                 hInstance, 
-                                 NULL);
-        if (Window)
+        WNDCLASSA WindowClass = {};
+        WindowClass.style = CS_HREDRAW|CS_VREDRAW|CS_OWNDC;  
+        WindowClass.lpfnWndProc = Win32WindowProc;
+        WindowClass.hInstance = hInstance;
+        WindowClass.hCursor = LoadCursor(NULL, IDC_ARROW);
+        WindowClass.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH); 
+        WindowClass.lpszClassName = "MainWindowClass";
+        if (RegisterClassA(&WindowClass))
         {
-            HDC WindowDC = GetDC(Window);
-            if (Win32InitOpenGL(WindowDC))
+            int WindowWidth = 1280;
+            int WindowHeight = 1000;
+            
+            DWORD WindowStyle = WS_OVERLAPPEDWINDOW;
+            // Calculate the size of the window so our client area is what we actually want. 
+            // It seems like this may not consistantly work and we may need to different system for fullscreen.
+            RECT Rect = {0, 0, WindowWidth, WindowHeight};
+            AdjustWindowRect(&Rect, WindowStyle, false);
+            
+            int RequestedWindowWidth = Rect.right - Rect.left;
+            int RequestedWindowHeight = Rect.bottom - Rect.top;
+            
+            Window = CreateWindowExA(0, 
+                                     WindowClass.lpszClassName,
+                                     "Base",
+                                     WindowStyle,
+                                     CW_USEDEFAULT, CW_USEDEFAULT,
+                                     RequestedWindowWidth, RequestedWindowHeight,
+                                     NULL, NULL, 
+                                     hInstance, 
+                                     NULL);
+            if (Window)
             {
-                ShowWindow(Window, nCmdShow);
-                
-                InitOpenGL();
-                
-                GlobalAppRunning = true;
-                while (GlobalAppRunning)
+                HDC WindowDC = GetDC(Window);
+                if (Win32InitOpenGL(WindowDC))
                 {
-                    v2s WindowDim = Win32GetWindowDim(Window);
-                    OpenGLBeginFrame();
+                    ShowWindow(Window, nCmdShow);
                     
-                    OpenGLEndFrame(WindowDim.Width, WindowDim.Height);
+                    InitOpenGL();
                     
-                    SwapBuffers(WindowDC);
+                    GlobalAppRunning = true;
+                    while (GlobalAppRunning)
+                    {
+                        v2s WindowDim = Win32GetWindowDim(Window);
+                        OpenGLBeginFrame();
+                        
+                        OpenGLEndFrame(WindowDim.Width, WindowDim.Height);
+                        
+                        SwapBuffers(WindowDC);
+                    }
+                    
                 }
                 
+                ReleaseDC(Window, WindowDC);
             }
-            
-            ReleaseDC(Window, WindowDC);
         }
-    }
 #endif
-
-}
-
+        
+    }
+    
+    

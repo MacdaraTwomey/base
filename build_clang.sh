@@ -16,7 +16,6 @@ fi
 
 ROOT=$PWD
 
-SOURCE="$ROOT/code/win32.cpp"
 INCLUDE="$ROOT/deps"
 LIBS="-lopengl32.lib -lkernel32.lib -l user32.lib -lgdi32.lib"
 DISABLED_WARNINGS=" \
@@ -33,11 +32,12 @@ DISABLED_WARNINGS=" \
 if [[ $OS == "win" ]]
 then
     CC="clang++.exe"
-    SOURCE=`wslpath -w "$SOURCE"`
+    SOURCE=`wslpath -w "$ROOT/code/win32.cpp"`
     INCLUDE=`wslpath -w "$INCLUDE"`
 elif [[ $OS == "linux" ]]
 then
     CC="clang++"
+    SOURCE="$ROOT/code/linux.cpp"
 else
     echo "Error: Invalid OS '$OS'"
     exit 1

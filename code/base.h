@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <float.h> 
 #include <math.h>  
+#include <stdarg.h> // va_list
 
 ///////////////////////////////////////////////////////////////////////
 // Usage
@@ -56,7 +57,7 @@
 #error "Could not detect CPU architecture"
 #endif
 
-#if !BASE_OS_WINDOWS
+#if !BASE_OS_WINDOWS && !BASE_OS_LINUX
 #error "This operating system is currently not supported"
 #endif
 

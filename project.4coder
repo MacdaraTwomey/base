@@ -21,13 +21,15 @@ load_paths = {
 
 commands = {
     // .cursor_at_end = false is an option
-
+    
     .build_clang = { .out = "*compilation*", .footer_panel = true, .save_dirty_files = true,         
-        .win = "bash build_clang.sh"},
+        .win = "bash build_clang.sh win",
+        .linux = "base build_clang.sh linux",
+    },
     
     .build_msvc = { .out = "*compilation*", .footer_panel = true, .save_dirty_files = true,
         .win = "bash build_msvc.sh"},
-
+    
     .run = { .out = "*run*", .footer_panel = true, .save_dirty_files = false,
         .win = "build\base_test.exe"},
     
