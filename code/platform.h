@@ -14,12 +14,14 @@ struct platform_file_contents
     u64 Size;
 };
 
-bool                   PlatformFileExists(string Filename);
-u64                    PlatformGetFileSize(string FileName);
+bool                   PlatformFileExists(string FilePath);
+u64                    PlatformGetFileSize(string FilePath);
 string                 PlatformGetExecutablePath(arena *Arena);
 
-platform_file_contents PlatformReadEntireFile(arena *Arena, string FileName);
+platform_file_contents PlatformReadEntireFile(arena *Arena, string FilePath);
 bool                   PlatformWriteEntireFile(u64 Size, u8 *Contents, string FilePath);
+
+// TODO: Handle deleteing directories
 bool                   PlatformDeleteFile(string FilePath);
 
 ///////////////////////////////////////////////////////////////////////

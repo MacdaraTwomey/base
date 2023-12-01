@@ -323,6 +323,14 @@ u8 *PushCString(arena *Arena, u8 *String)
     return Memory;
 }
 
+u8 *PushCString(arena *Arena, string String)
+{
+    u8 *StringZ  = PushArray(&Scratch, String.Length + 1, u8);
+    MemoryCopy(String.Length, String.Str, StringZ);
+    StringZ[String.Length] = 0;
+    return StringZ;
+}
+
 string PushString(arena *Arena, string String)
 {
     u8 *StringData = (u8 *)PushCopy_(Arena, String.Length, String.Str, 1);
