@@ -12,10 +12,10 @@
 bool PlatformFileExists(string FilePath)
 {
     temp_memory Scratch = GetScratch();
-    u8 *PathZ  = PushCString(&Scratch, FilePath);
+    u8 *PathZ  = PushCString(Scratch.Arena, FilePath);
     
     // F_OK checks for existence
-    int Result = access(PathZ, F_OK);
+    int Result = access((char *)PathZ, F_OK);
     
     ReleaseScratch(Scratch);
     
@@ -25,17 +25,17 @@ bool PlatformFileExists(string FilePath)
 u64 PlatformGetFileSize(string FilePath)
 {
     temp_memory Scratch = GetScratch();
-    u8 *PathZ  = PushCString(&Scratch, FilePath);
+    u8 *PathZ  = PushCString(Scratch.Arena, FilePath);
     
     u64 Size = 0;
     
     // stat() will follow links so the stat()'ed file should never be a symbolic link.
     // It could be a directory, pipe, socket, character device, fifo though.
     struct stat64 Info = {};
-    if (stat64(PathZ, &Info) == 0)
+    if (stat64((char *)PathZ, &Info) == 0)
     {
         Assert(S_ISREG(Info.st_mode));
-        Size = st_size;
+        Size = Info.st_size;
     }
     
     ReleaseScratch(Scratch);
@@ -49,13 +49,12 @@ string PlatformGetExecutablePath(arena *Arena)
     
     u64 BufferSize = KB(8);
     u8 *Buffer = PushArray(Arena, BufferSize, u8);
-    ssize_t PathLength = readlink("/proc/self/exe", Buffer, BufferSize);
+    ssize_t PathLength = readlink("/proc/self/exe", (char *)Buffer, BufferSize);
     if (PathLength != -1)
     {
         u64 Excess = BufferSize - PathLength;
         PopSize(Arena, Excess);
         Path = CreateString(Buffer, PathLength);
-        break;
     }
     
     return Path;
@@ -67,17 +66,17 @@ platform_file_contents PlatformReadEntireFile(arena *Arena, string FilePath)
     
     temp_memory Scratch = GetScratch();
     
-    u8 *PathZ  = PushCString(&Scratch, FilePath);
-    int FileHandle = open(PathZ, O_RDONLY);
+    u8 *PathZ  = PushCString(Scratch.Arena, FilePath);
+    int FileHandle = open((char *)PathZ, O_RDONLY);
     if (FileHandle >= 0)
     {
         struct stat64 Info = {};
         if (fstat64(FileHandle, &Info) == 0)
         {
-            Assert(IS_REG(Info.st_mode));
-            u64 FileSize = st_size;
+            Assert(S_ISREG(Info.st_mode));
+            u64 FileSize = Info.st_size;
             u8 *Buffer = PushArray(Arena, FileSize, u8);
-            Assert(FileSize <= SSIZE_MAX);
+            Assert(FileSize <= S64Max);
             
             ssize_t ReadCount = read(FileHandle, Buffer, FileSize);
             if (ReadCount == FileSize)
@@ -101,17 +100,17 @@ platform_file_contents PlatformReadEntireFile(arena *Arena, string FilePath)
 
 bool PlatformWriteEntireFile(u64 Size, u8 *Contents, string FilePath)
 {
-    Assert(Size <= SSIZE_MAX);
+    Assert(Size <= S64Max);
     
     bool Success = false;
     
     temp_memory Scratch = GetScratch();
     
-    u8 *PathZ  = PushCString(&Scratch, FilePath);
-    int FileHandle = open(PathZ, O_WRONLY);
+    u8 *PathZ  = PushCString(Scratch.Arena, FilePath);
+    int FileHandle = open((char *)PathZ, O_WRONLY);
     if (FileHandle >= 0)
     {
-        ssize_t WriteCount = write(FileHandle, Size, Contents);
+        ssize_t WriteCount = write(FileHandle, Contents, Size);
         if (WriteCount == Size)
         {
             Success = true;
@@ -129,8 +128,8 @@ bool PlatformDeleteFile(string FilePath)
 {
     temp_memory Scratch = GetScratch();
     
-    u8 *PathZ  = PushCString(&Scratch, FilePath);
-    bool Success = (unlink(PathZ) == 0);
+    u8 *PathZ  = PushCString(Scratch.Arena, FilePath);
+    bool Success = (unlink((char *)PathZ) == 0);
     
     ReleaseScratch(Scratch);
     
@@ -146,7 +145,7 @@ void *PlatformMemoryReserve(u64 Size)
     Assert(Size > 0);
     Assert(sysconf(_SC_PAGE_SIZE) == 4096);
     
-    void *Memory = mmap(0, 0, PROT_READ|PPROT_WRITE, MAP_ANONYMOUS, -1, 0);
+    void *Memory = mmap(0, 0, PROT_READ|PROT_WRITE, MAP_ANONYMOUS, -1, 0);
     if (Memory == MAP_FAILED)
     {
         Memory = 0;
@@ -159,7 +158,7 @@ bool PlatformMemoryCommit(void *Address, u64 Size)
 {
     Assert(Address);
     Assert(Size > 0);
-    MemoryZero(Address, Size);
+    MemoryZero(Size, Address);
     return true; 
 }
 

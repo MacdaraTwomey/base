@@ -22,9 +22,13 @@ load_paths = {
 commands = {
     // .cursor_at_end = false is an option
     
-    .build_clang = { .out = "*compilation*", .footer_panel = true, .save_dirty_files = true,         
-        .win = "bash build_clang.sh win",
-        .linux = "base build_clang.sh linux",
+    .build_clang_win = { .out = "*compilation*", .footer_panel = true, .save_dirty_files = true,         
+        .win = "bash build_clang.sh win"
+    },
+    
+    // WSL build
+    .build_clang_linux = { .out = "*compilation*", .footer_panel = true, .save_dirty_files = true,         
+        .win = "bash build_clang.sh linux"
     },
     
     .build_msvc = { .out = "*compilation*", .footer_panel = true, .save_dirty_files = true,
@@ -38,8 +42,9 @@ commands = {
 };
 fkey_command = {
     // Alt-m seems to run the F1 command
-    .F1 = "build_msvc",
+    .F1 = "build_clang_linux",
+    //.F1 = "build_msvc",
     .F2 = "run",
     .F3 = "buildrun",
-    .F4 = "build_clang",
+    .F4 = "build_clang_win",
 };

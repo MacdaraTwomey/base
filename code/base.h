@@ -297,6 +297,7 @@ string CreateString(u8 *StringData, u64 Length);
 
 string PushString(arena *Arena, string String);
 u8 *   PushCString(arena *Arena, u8 *String);
+u8 *PushCString(arena *Arena, string String);
 string PushFormatStringArgs(arena *Arena, char *Format, va_list Args);
 string PushFormatString(arena *Arena, char *Format, ...);
 

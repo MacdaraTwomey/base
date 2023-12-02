@@ -17,7 +17,6 @@ fi
 ROOT=$PWD
 
 INCLUDE="$ROOT/deps"
-LIBS="-lopengl32.lib -lkernel32.lib -l user32.lib -lgdi32.lib"
 DISABLED_WARNINGS=" \
 -Wno-unused-variable \
 -Wno-gnu-anonymous-struct \
@@ -32,8 +31,10 @@ DISABLED_WARNINGS=" \
 if [[ $OS == "win" ]]
 then
     CC="clang++.exe"
-    SOURCE=`wslpath -w "$ROOT/code/win32.cpp"`
-    INCLUDE=`wslpath -w "$INCLUDE"`
+	# -m uses '/' instead of '\'
+    SOURCE=`wslpath -m "$ROOT/code/win32.cpp"`
+    INCLUDE=`wslpath -m "$INCLUDE"`
+	LIBS="-lopengl32.lib -lkernel32.lib -l user32.lib -lgdi32.lib"
 elif [[ $OS == "linux" ]]
 then
     CC="clang++"
@@ -45,8 +46,14 @@ fi
 
 pushd build
 
-set -x # echo commands
+CMD="$CC -o base_test.exe -g -Wall -pedantic-errors -std=c++14 $DISABLED_WARNINGS $SOURCE -I $INCLUDE $LIBS"
 
-$CC -o base_test.exe -g -Wall -pedantic-errors -std=c++14 $DISABLED_WARNINGS $SOURCE -I $INCLUDE $LIBS
+if [[ $OS == "linux" ]]
+then
+	# Fixup error paths so we can jump to error on WSL
+    eval "$CMD" 2>&1 | sed 's/\/mnt\/c/c:/g'
+else
+	eval "$CMD"
+fi
 
 popd
