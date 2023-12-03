@@ -175,8 +175,8 @@ bool Win32CreateOpenGLContext(HDC WindowDC)
                                     if (SpaceIndex < ExtensionList.Length)
                                     {
                                         string Extension = StringPrefix(ExtensionList, SpaceIndex);
-                                        if (StringsAreEqual(Extension, StringLit("WGL_EXT_framebuffer_sRGB")) ||
-                                            StringsAreEqual(Extension, StringLit("WGL_ARB_framebuffer_sRGB")))
+                                        if (StringsAreEqual(Extension, StrLit("WGL_EXT_framebuffer_sRGB")) ||
+                                            StringsAreEqual(Extension, StrLit("WGL_ARB_framebuffer_sRGB")))
                                         {
                                             sRGBSupported = true;
                                             break;

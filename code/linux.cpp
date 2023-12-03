@@ -13,7 +13,7 @@
 // If we do this, then we can use access().
 bool PlatformFileExists(string FilePath)
 {
-    temp_memory Scratch = GetScratch();
+    temp_arena Scratch = GetScratch();
     u8 *PathZ  = PushCString(Scratch.Arena, FilePath);
     
     bool Exists = false;
@@ -31,7 +31,7 @@ bool PlatformFileExists(string FilePath)
 
 u64 PlatformGetFileSize(string FilePath)
 {
-    temp_memory Scratch = GetScratch();
+    temp_arena Scratch = GetScratch();
     u8 *PathZ  = PushCString(Scratch.Arena, FilePath);
     
     u64 Size = 0;
@@ -55,7 +55,7 @@ string PlatformGetExecutablePath(arena *Arena)
     string Path = {};
     
     u64 BufferSize = KB(8);
-    u8 *Buffer = PushArray(Arena, BufferSize, u8);
+    u8 *Buffer = PushArrayNoZero(Arena, BufferSize, u8);
     ssize_t PathLength = readlink("/proc/self/exe", (char *)Buffer, BufferSize);
     if (PathLength != -1)
     {
@@ -71,7 +71,7 @@ string PlatformReadEntireFile(arena *Arena, string FilePath)
 {
     string Contents = {};
     
-    temp_memory Scratch = GetScratch();
+    temp_arena Scratch = GetScratch();
     
     u8 *PathZ  = PushCString(Scratch.Arena, FilePath);
     int FileHandle = open((char *)PathZ, O_RDONLY);
@@ -82,7 +82,7 @@ string PlatformReadEntireFile(arena *Arena, string FilePath)
         {
             Assert(S_ISREG(Info.st_mode));
             u64 FileSize = Info.st_size;
-            u8 *Buffer = PushArray(Arena, FileSize, u8);
+            u8 *Buffer = PushArrayNoZero(Arena, FileSize, u8);
             Assert(FileSize <= S64Max);
             
             ssize_t ReadCount = read(FileHandle, Buffer, FileSize);
@@ -111,7 +111,7 @@ bool PlatformWriteEntireFile(u64 Size, u8 *Contents, string FilePath)
     
     bool Success = false;
     
-    temp_memory Scratch = GetScratch();
+    temp_arena Scratch = GetScratch();
     
     u8 *PathZ  = PushCString(Scratch.Arena, FilePath);
     int FileHandle = creat((char *)PathZ, 0);
@@ -132,7 +132,7 @@ bool PlatformWriteEntireFile(u64 Size, u8 *Contents, string FilePath)
 
 bool PlatformDeleteFile(string FilePath)
 {
-    temp_memory Scratch = GetScratch();
+    temp_arena Scratch = GetScratch();
     
     u8 *PathZ  = PushCString(Scratch.Arena, FilePath);
     bool Success = (unlink((char *)PathZ) == 0);

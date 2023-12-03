@@ -12,7 +12,7 @@
 
 // TODO: Make thread local
 // TODO: Do we want a pool of possible scratch arenas
-static arena *GlobalScratchArena_ = nullptr;
+static arena *GlobalScratchArenaPool[2] = {};
 
 #define ARENA_HEADER_SIZE 64
 #define PAGE_SIZE 4096
@@ -238,23 +238,24 @@ void ClearArena(arena *Arena)
     PopToPosition(Arena, ARENA_HEADER_SIZE);
 }
 
-temp_memory BeginTempMemory(arena *Arena)
+temp_arena BeginTempArena(arena *Arena)
 {
-    temp_memory Temp = {};
+    temp_arena Temp = {};
     Temp.Arena = Arena;
     Temp.StartPos = Arena->Pos; 
+    Temp.StartTempCount = Arena->TempCount;
     
     Arena->TempCount += 1;
     
     return Temp;
 }
 
-void EndTempMemory(temp_memory TempMemory)
+void EndTempArena(temp_arena TempArena)
 {
-    arena *Arena = TempMemory.Arena;
-    Assert(Arena->TempCount > 0);
+    arena *Arena = TempArena.Arena;
+    Assert(Arena->TempCount == TempArena.StartTempCount);
     
-    PopToPosition(Arena, TempMemory.StartPos);
+    PopToPosition(Arena, TempArena.StartPos);
     Arena->TempCount -= 1;
 }
 
@@ -263,24 +264,51 @@ void CheckArena(arena *Arena)
     Assert(Arena->TempCount == 0);
 }
 
-temp_memory GetScratch()
+temp_arena GetScratch(arena **Conflicts, u32 ConflictCount)
 {
-    if (GlobalScratchArena_ == nullptr)
+    if (GlobalScratchArenaPool[0] == 0)
     {
-        GlobalScratchArena_ = CreateArena(GB(8));
+        static_assert(ArrayCount(GlobalScratchArenaPool) == 2, "Must be only two scratch arenas");
+        GlobalScratchArenaPool[0] = CreateArena(GB(8));
+        GlobalScratchArenaPool[1] = CreateArena(GB(8));
     }
     
-    arena *Arena = GlobalScratchArena_;
+    arena *Arena = GlobalScratchArenaPool[0];
+    if (ConflictCount > 0) 
+    {
+        for (u32 i = 0; i < ConflictCount; ++i) 
+        {
+            if (GlobalScratchArenaPool[0] == Conflicts[i]) 
+            {
+                Arena = 0;
+                break;
+            }
+        }
+
+        if (!Arena) 
+        {
+            Arena = GlobalScratchArenaPool[1];
+            for (u32 i = 0; i < ConflictCount; ++i) 
+            {
+                if (GlobalScratchArenaPool[1] == Conflicts[i]) 
+                {
+                    Arena = 0;
+                    break;
+                }
+            }
+        }
+    }
+
+    Assert(Arena && "Unable to get non-conflicting arena");
     
-    Assert(Arena->TempCount == 0);
-    return BeginTempMemory(Arena);
+    return BeginTempArena(Arena);
 }
 
-void ReleaseScratch(temp_memory ScratchMemory)
+void ReleaseScratch(temp_arena ScratchMemory)
 {
-    Assert(ScratchMemory.Arena == GlobalScratchArena_);
-    Assert(ScratchMemory.Arena->TempCount == 1);
-    EndTempMemory(ScratchMemory);
+    Assert(ScratchMemory.Arena == GlobalScratchArenaPool[0] || 
+           ScratchMemory.Arena == GlobalScratchArenaPool[1]);
+    EndTempArena(ScratchMemory);
 } 
 
 ///////////////////////////////////////////////////////////////////////
@@ -325,7 +353,7 @@ u8 *PushCString(arena *Arena, u8 *String)
 
 u8 *PushCString(arena *Arena, string String)
 {
-    u8 *StringZ  = PushArray(Arena, String.Length + 1, u8);
+    u8 *StringZ  = PushArrayNoZero(Arena, String.Length + 1, u8);
     MemoryCopy(String.Length, String.Str, StringZ);
     StringZ[String.Length] = 0;
     return StringZ;
@@ -351,7 +379,7 @@ string PushStringfArgs(arena *Arena, char *Format, va_list Args)
 {
     u64 Length = 0;
     u64 Capacity = 1024;
-    u8 *Buffer = PushArray(Arena, Capacity, u8);
+    u8 *Buffer = PushArrayNoZero(Arena, Capacity, u8);
     
     // We have to copy the va_list because we may call vsnprintf twice
     va_list ArgsCopy;
@@ -373,7 +401,7 @@ string PushStringfArgs(arena *Arena, char *Format, va_list Args)
         
         PopSize(Arena, Capacity);
         u64 NewCapacity = (u64)RequiredCharCount + 1;
-        Buffer = PushArray(Arena, NewCapacity, u8);
+        Buffer = PushArrayNoZero(Arena, NewCapacity, u8);
         
         int WrittenCharCount = vsnprintf((char *)Buffer, NewCapacity, Format, ArgsCopy);
         if (WrittenCharCount < 0)
@@ -611,6 +639,35 @@ bool StringContainsChar(string String, u8 Char)
     return StringFindChar(String, Char) < String.Length;
 }
 
+bool StringContainsStr(string String, string Substr)
+{
+    // O(n^2) 
+    bool ContainsSubstr = false;
+    if (String.Length >= Substr.Length && Substr.Length > 0) 
+    {
+        u64 LastPossibleCharIndex = String.Length - Substr.Length;
+        for (u64 i = 0; i <= LastPossibleCharIndex; ++i)
+        {
+            if (String.Str[i] == Substr.Str[0])
+            {
+                ContainsSubstr = true;
+                for (u64 j = 1; j < Substr.Length; ++j)
+                {
+                    if (String.Str[i + j] != Substr.Str[j])
+                    {
+                        ContainsSubstr = false;
+                        break;
+                    }
+                }
+                
+                if (ContainsSubstr) break;
+            }
+        }
+    }
+    
+    return ContainsSubstr;
+}
+
 bool StringsAreEqual(string A, string B)
 {
     bool Result = (A.Length == B.Length);
@@ -645,35 +702,6 @@ bool StringsAreEqualCaseInsensitive(string a, string b)
     }
     
     return Result;
-}
-
-bool StringContainsSubstr(string String, string Substr)
-{
-    // O(n^2) 
-    bool ContainsSubstr = false;
-    if (String.Length >= Substr.Length && Substr.Length > 0) 
-    {
-        u64 LastPossibleCharIndex = String.Length - Substr.Length;
-        for (u64 i = 0; i <= LastPossibleCharIndex; ++i)
-        {
-            if (String.Str[i] == Substr.Str[0])
-            {
-                ContainsSubstr = true;
-                for (u64 j = 1; j < Substr.Length; ++j)
-                {
-                    if (String.Str[i + j] != Substr.Str[j])
-                    {
-                        ContainsSubstr = false;
-                        break;
-                    }
-                }
-                
-                if (ContainsSubstr) break;
-            }
-        }
-    }
-    
-    return ContainsSubstr;
 }
 
 u64 StringFindLastSlash(string Path)
@@ -722,42 +750,62 @@ string DirectoryFromPath(string Path)
     return Directory;
 }
 
-void Append(arena *Arena, string_list *list, string String)
+void StringListAppend(arena *Arena, string_list *List, string String)
 {
     string_node *Node = PushStruct(Arena, string_node);
     Node->String = PushString(Arena, String);
     Node->Next = nullptr;
     
-    if (Head == nullptr)
+    if (List->Head == nullptr)
     {
-        Head = Node;
+        List->Head = Node;
     }
     else
     {
-        Tail->Next = Node;
+        List->Tail->Next = Node;
     }
     
-    Tail = Node;
-    Length += String.Length;
+    List->Tail = Node;
+    List->Length += String.Length;
 }
 
-void string_list::Append(arena *Arena, char *String)
+void StringListAppend(arena *Arena, string_list *List, char *String)
 {
-    Append(Arena, CreateString((u8 *)String));
+    StringListAppend(Arena, List, CreateString((u8 *)String));
 }
 
-string string_list::GetString(arena *Arena)
+string StringListJoin(arena *Arena, string_list *List)
 {
-    u8 *StringMemory = PushArray(Arena, Length, u8);
+    u8 *StringMemory = PushArrayNoZero(Arena, List->Length, u8);
     
     u64 CopiedLength = 0;
-    for (string_node *Node = Head; Node != nullptr; Node = Node->Next)
+    for (string_node *Node = List->Head; Node; Node = Node->Next)
     {
         MemoryCopy(Node->String.Length, Node->String.Str, StringMemory + CopiedLength);
         CopiedLength += Node->String.Length;
     }
     
-    Assert(CopiedLength == Length);
+    Assert(CopiedLength == List->Length);
+    
+    string Result;
+    Result.Str = StringMemory;
+    Result.Length = CopiedLength;
+    return Result;
+}
+
+
+string StringListSplit(arena *Arena, string_list *List)
+{
+    u8 *StringMemory = PushArrayNoZero(Arena, List->Length, u8);
+    
+    u64 CopiedLength = 0;
+    for (string_node *Node = List->Head; Node; Node = Node->Next)
+    {
+        MemoryCopy(Node->String.Length, Node->String.Str, StringMemory + CopiedLength);
+        CopiedLength += Node->String.Length;
+    }
+    
+    Assert(CopiedLength == List->Length);
     
     string Result;
     Result.Str = StringMemory;

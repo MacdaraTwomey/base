@@ -215,7 +215,7 @@ void RunTests()
     {
         arena *Arena = CreateArena(GB(300));
         
-        u32 *Array1 = PushArrayZero(Arena, MB(30) / 4, u32);
+        u32 *Array1 = PushArray(Arena, MB(30) / 4, u32);
         u32 *Array2 = PushArray(Arena, MB(30) / 4, u32);
         
         for (u32 i = 0; i < 10000; ++i)
@@ -242,17 +242,17 @@ void RunTests()
         for (u32 i = 0; i < MB(100); ++i)
             Array3[i] = (u8)i;
         
-        temp_memory TempMemory1 = BeginTempMemory(Arena);
+        temp_arena TempMemory1 = BeginTempArena(Arena);
         u8 *Array4 = PushArray(Arena, 100, u8);
         MemoryZero(100, Array4);
-        temp_memory TempMemory2 = BeginTempMemory(Arena);
+        temp_arena TempMemory2 = BeginTempArena(Arena);
         u8 *Array5 = PushArray(Arena, 100, u8);
         MemoryZero(100, Array5);
         
-        EndTempMemory(TempMemory1); // In wrong order
-        EndTempMemory(TempMemory2);
+        EndTempArena(TempMemory1); // In wrong order
+        EndTempArena(TempMemory2);
         
-        temp_memory Scratch = GetScratch();
+        temp_arena Scratch = GetScratch();
         
         u16 *Array6 = PushArray(Scratch.Arena, 10000, u16);
         MemoryZero(10000 * 2, Array6);
@@ -279,9 +279,9 @@ void RunTests()
         const char *conststr = "0123456789";
         string NumberString = PushStringf(Arena, (char *)"%s %u ABCDEF, !%f", conststr, 2342u, 0.0002342234f);
         
-        string StringUpper = StringLit("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
-        string StringLower = StringLit("abcdefghijklmnopqrstuvwxyz");
-        string StringNumbers = StringLit("0123456789");
+        string StringUpper = StrLit("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
+        string StringLower = StrLit("abcdefghijklmnopqrstuvwxyz");
+        string StringNumbers = StrLit("0123456789");
         
         u8 C1 = StringGetChar(StringUpper, 25);
         Assert(C1 == 'Z');
@@ -309,67 +309,67 @@ void RunTests()
         u64 Index3 = StringFindLastChar(StringUpper, 'D');
         Assert(Index3 == 3);
         
-        u64 Index4 = StringFindLastChar(StringLit(""), '6');
+        u64 Index4 = StringFindLastChar(StrLit(""), '6');
         Assert(Index4 == 0);
 
 
-        string Haystack1 = StringLit("THE CAT end");
-        u64 Pos1 = StringFindStr(Haystack1, StringLit("CAT"));
+        string Haystack1 = StrLit("THE CAT end");
+        u64 Pos1 = StringFindStr(Haystack1, StrLit("CAT"));
         Assert(Pos1 == 4);
         
-        u64 Pos2 = StringFindStr(Haystack1, StringLit("CATE"));
+        u64 Pos2 = StringFindStr(Haystack1, StrLit("CATE"));
         Assert(Pos2 == Haystack1.Length);
 
-        u64 Pos3 = StringFindStr(Haystack1, StringLit(""));
+        u64 Pos3 = StringFindStr(Haystack1, StrLit(""));
         Assert(Pos3 == Haystack1.Length);
 
-        u64 Pos4 = StringFindStr(StringLit(""), StringLit(""));
+        u64 Pos4 = StringFindStr(StrLit(""), StrLit(""));
         Assert(Pos4 == 0);
 
-        u64 Pos5 = StringFindStr(StringLit(""), StringLit("ADE"));
+        u64 Pos5 = StringFindStr(StrLit(""), StrLit("ADE"));
         Assert(Pos5 == 0);
 
-        string Haystack2 = StringLit("LE CHAT");
+        string Haystack2 = StrLit("LE CHAT");
         
-        u64 Pos6 = StringFindStr(Haystack2, StringLit("CHATE"));
+        u64 Pos6 = StringFindStr(Haystack2, StrLit("CHATE"));
         Assert(Pos6 == Haystack2.Length);
 
-        u64 Pos7 = StringFindStr(Haystack2, StringLit("LE CHATE"));
+        u64 Pos7 = StringFindStr(Haystack2, StrLit("LE CHATE"));
         Assert(Pos7 == Haystack2.Length);
 
-        u64 Pos8 = StringFindStr(Haystack2, StringLit("LE CHAT"));
+        u64 Pos8 = StringFindStr(Haystack2, StrLit("LE CHAT"));
         Assert(Pos8 == 0);
 
-        u64 Pos9 = StringFindStr(Haystack2, StringLit("T"));
+        u64 Pos9 = StringFindStr(Haystack2, StrLit("T"));
         Assert(Pos9 == 6);
 
-        string Haystack3 = StringLit("CA cat CATeCATCATE ");
-        u64 Pos10 = StringFindStr(Haystack3, StringLit("CATE"));
+        string Haystack3 = StrLit("CA cat CATeCATCATE ");
+        u64 Pos10 = StringFindStr(Haystack3, StrLit("CATE"));
         Assert(Pos10 == 14);
 
 
-        Assert(StringContainsChar(StringLit("ABC"), 'B'));
-        Assert(StringContainsChar(StringLit("B"), 'B'));
-        Assert(!StringContainsChar(StringLit(""), 'B'));
+        Assert(StringContainsChar(StrLit("ABC"), 'B'));
+        Assert(StringContainsChar(StrLit("B"), 'B'));
+        Assert(!StringContainsChar(StrLit(""), 'B'));
         
-        Assert(StringContainsSubstr(StringLit("abcdefghij"), StringLit("defg")));
-        Assert(!StringContainsSubstr(StringLit("abc"), StringLit("abcd")));
-        Assert(!StringContainsSubstr(StringLit(""), StringLit("abcd")));
-        Assert(!StringContainsSubstr(StringLit("abc"), StringLit("")));
+        Assert(StringContainsStr(StrLit("abcdefghij"), StrLit("defg")));
+        Assert(!StringContainsStr(StrLit("abc"), StrLit("abcd")));
+        Assert(!StringContainsStr(StrLit(""), StrLit("abcd")));
+        Assert(!StringContainsStr(StrLit("abc"), StrLit("")));
         
         //                                               01234567890123456789
-        u64 SlashIndex1 = StringFindLastSlash(StringLit("C:/dev/test/file.exe"));
+        u64 SlashIndex1 = StringFindLastSlash(StrLit("C:/dev/test/file.exe"));
         Assert(SlashIndex1 == 11);
         
-        string FileExe = StringLit("file.exe");
+        string FileExe = StrLit("file.exe");
         u64 SlashIndex2 = StringFindLastSlash(FileExe);
         Assert(SlashIndex2 == FileExe.Length);
         
-        string TestDotTarGz = StringLit("test.tar.gz");
-        string TestDotObjDot = StringLit("test.obj.");
-        string TestDotDotObj = StringLit("test..obj");
-        string Test = StringLit("test");
-        string Dot = StringLit(".");
+        string TestDotTarGz = StrLit("test.tar.gz");
+        string TestDotObjDot = StrLit("test.obj.");
+        string TestDotDotObj = StrLit("test..obj");
+        string Test = StrLit("test");
+        string Dot = StrLit(".");
         RemoveExtension(&FileExe);
         RemoveExtension(&TestDotTarGz);
         RemoveExtension(&TestDotObjDot);
@@ -377,73 +377,73 @@ void RunTests()
         RemoveExtension(&Test);
         RemoveExtension(&Dot);
         
-        Assert(StringsAreEqual(FileExe, StringLit("file"))); 
-        Assert(StringsAreEqual(TestDotTarGz, StringLit("test.tar"))); 
-        Assert(StringsAreEqual(TestDotObjDot, StringLit("test.obj"))); 
-        Assert(StringsAreEqual(TestDotDotObj, StringLit("test."))); 
-        Assert(StringsAreEqual(Test, StringLit("test"))); 
-        Assert(StringsAreEqual(Dot, StringLit(""))); 
+        Assert(StringsAreEqual(FileExe, StrLit("file"))); 
+        Assert(StringsAreEqual(TestDotTarGz, StrLit("test.tar"))); 
+        Assert(StringsAreEqual(TestDotObjDot, StrLit("test.obj"))); 
+        Assert(StringsAreEqual(TestDotDotObj, StrLit("test."))); 
+        Assert(StringsAreEqual(Test, StrLit("test"))); 
+        Assert(StringsAreEqual(Dot, StrLit(""))); 
         
-        Assert(StringsAreEqual(StringLit("file.exe"), FilenameFromPath(StringLit("C:/dev/test/file.exe")))); 
-        Assert(StringsAreEqual(StringLit("file.exe"), FilenameFromPath(StringLit("C://dev/test////file.exe")))); 
-        Assert(StringsAreEqual(StringLit("file.exe"), FilenameFromPath(StringLit("/c/dev/test/file.exe")))); 
-        Assert(StringsAreEqual(StringLit("file"), FilenameFromPath(StringLit("/c/dev/test/file")))); 
-        Assert(StringsAreEqual(StringLit("file"), FilenameFromPath(StringLit("/c/.dev/test //file")))); 
-        Assert(StringsAreEqual(StringLit(""), FilenameFromPath(StringLit("/c/dev/test/file/")))); 
-        Assert(StringsAreEqual(StringLit(""), FilenameFromPath(StringLit("file")))); 
-        Assert(StringsAreEqual(StringLit(""), FilenameFromPath(StringLit("/")))); 
-        Assert(StringsAreEqual(StringLit("c"), FilenameFromPath(StringLit("/c")))); 
-        Assert(StringsAreEqual(StringLit("elmo.doc"), FilenameFromPath(StringLit("C:/abc\\def//hjkl\\\\sdfsdf/elmo.doc")))); 
+        Assert(StringsAreEqual(StrLit("file.exe"), FilenameFromPath(StrLit("C:/dev/test/file.exe")))); 
+        Assert(StringsAreEqual(StrLit("file.exe"), FilenameFromPath(StrLit("C://dev/test////file.exe")))); 
+        Assert(StringsAreEqual(StrLit("file.exe"), FilenameFromPath(StrLit("/c/dev/test/file.exe")))); 
+        Assert(StringsAreEqual(StrLit("file"), FilenameFromPath(StrLit("/c/dev/test/file")))); 
+        Assert(StringsAreEqual(StrLit("file"), FilenameFromPath(StrLit("/c/.dev/test //file")))); 
+        Assert(StringsAreEqual(StrLit(""), FilenameFromPath(StrLit("/c/dev/test/file/")))); 
+        Assert(StringsAreEqual(StrLit(""), FilenameFromPath(StrLit("file")))); 
+        Assert(StringsAreEqual(StrLit(""), FilenameFromPath(StrLit("/")))); 
+        Assert(StringsAreEqual(StrLit("c"), FilenameFromPath(StrLit("/c")))); 
+        Assert(StringsAreEqual(StrLit("elmo.doc"), FilenameFromPath(StrLit("C:/abc\\def//hjkl\\\\sdfsdf/elmo.doc")))); 
         
-        Assert(StringsAreEqual(StringLit("C:/dev/test/"), DirectoryFromPath(StringLit("C:/dev/test/file.exe")))); 
-        Assert(StringsAreEqual(StringLit("C://dev/test////"), DirectoryFromPath(StringLit("C://dev/test////file.exe")))); 
-        Assert(StringsAreEqual(StringLit("/c/dev/test/"), DirectoryFromPath(StringLit("/c/dev/test/file.exe")))); 
-        Assert(StringsAreEqual(StringLit("/c/dev/test/"), DirectoryFromPath(StringLit("/c/dev/test/file")))); 
-        Assert(StringsAreEqual(StringLit("/c/.dev/test //"), DirectoryFromPath(StringLit("/c/.dev/test //file")))); 
-        Assert(StringsAreEqual(StringLit("/c/dev/test/file/"), DirectoryFromPath(StringLit("/c/dev/test/file/")))); 
-        Assert(StringsAreEqual(StringLit(""), DirectoryFromPath(StringLit("file")))); 
-        Assert(StringsAreEqual(StringLit("/"), DirectoryFromPath(StringLit("/")))); 
-        Assert(StringsAreEqual(StringLit("/"), DirectoryFromPath(StringLit("/c")))); 
-        Assert(StringsAreEqual(StringLit("C:/abc\\def//hjkl\\\\sdfsdf/"), DirectoryFromPath(StringLit("C:/abc\\def//hjkl\\\\sdfsdf/elmo.doc")))); 
+        Assert(StringsAreEqual(StrLit("C:/dev/test/"), DirectoryFromPath(StrLit("C:/dev/test/file.exe")))); 
+        Assert(StringsAreEqual(StrLit("C://dev/test////"), DirectoryFromPath(StrLit("C://dev/test////file.exe")))); 
+        Assert(StringsAreEqual(StrLit("/c/dev/test/"), DirectoryFromPath(StrLit("/c/dev/test/file.exe")))); 
+        Assert(StringsAreEqual(StrLit("/c/dev/test/"), DirectoryFromPath(StrLit("/c/dev/test/file")))); 
+        Assert(StringsAreEqual(StrLit("/c/.dev/test //"), DirectoryFromPath(StrLit("/c/.dev/test //file")))); 
+        Assert(StringsAreEqual(StrLit("/c/dev/test/file/"), DirectoryFromPath(StrLit("/c/dev/test/file/")))); 
+        Assert(StringsAreEqual(StrLit(""), DirectoryFromPath(StrLit("file")))); 
+        Assert(StringsAreEqual(StrLit("/"), DirectoryFromPath(StrLit("/")))); 
+        Assert(StringsAreEqual(StrLit("/"), DirectoryFromPath(StrLit("/c")))); 
+        Assert(StringsAreEqual(StrLit("C:/abc\\def//hjkl\\\\sdfsdf/"), DirectoryFromPath(StrLit("C:/abc\\def//hjkl\\\\sdfsdf/elmo.doc")))); 
         
-        temp_memory Scratch = GetScratch();
+        temp_arena Scratch = GetScratch();
         
-        string_list Builder = CreateStringBuilder();
-        Builder.Append(Scratch.Arena, (char *)"This is the first string. ");
-        Builder.Append(Scratch.Arena, StringLit("This is the 2nd string."));
-        Builder.Append(Scratch.Arena, StringLit("The last string."));
-        Builder.Append(Scratch.Arena, StringLit("\0"));
+        string_list List = {};
+        StringListAppend(Scratch.Arena, &List, (char *)"This is the first string. ");
+        StringListAppend(Scratch.Arena, &List, StrLit("This is the 2nd string."));
+        StringListAppend(Scratch.Arena, &List, StrLit("The last string."));
+        StringListAppend(Scratch.Arena, &List, StrLit("\0"));
         
-        string WholeString = Builder.GetString(Arena);
+        string WholeString = StringListJoin(Arena, &List);
         
         ReleaseScratch(Scratch);
         
-        Assert(StringsAreEqual(StringPrefix(StringLit("ABCDEF"), 3), StringLit("ABC")));
-        Assert(StringsAreEqual(StringPrefix(StringLit("ABCDEF"), 6), StringLit("ABCDEF")));
-        Assert(StringsAreEqual(StringPrefix(StringLit("ABCDEF"), 10), StringLit("ABCDEF")));
-        Assert(StringsAreEqual(StringPrefix(StringLit("ABCDEF"), 0), StringLit("")));
-        Assert(StringsAreEqual(StringPrefix(StringLit(""), 1), StringLit("")));
+        Assert(StringsAreEqual(StringPrefix(StrLit("ABCDEF"), 3), StrLit("ABC")));
+        Assert(StringsAreEqual(StringPrefix(StrLit("ABCDEF"), 6), StrLit("ABCDEF")));
+        Assert(StringsAreEqual(StringPrefix(StrLit("ABCDEF"), 10), StrLit("ABCDEF")));
+        Assert(StringsAreEqual(StringPrefix(StrLit("ABCDEF"), 0), StrLit("")));
+        Assert(StringsAreEqual(StringPrefix(StrLit(""), 1), StrLit("")));
         
-        Assert(StringsAreEqual(StringSuffix(StringLit("ABCDEF"), 3), StringLit("DEF")));
-        Assert(StringsAreEqual(StringSuffix(StringLit("ABCDEF"), 5), StringLit("BCDEF")));
-        Assert(StringsAreEqual(StringSuffix(StringLit("ABCDEF"), 10), StringLit("ABCDEF")));
-        Assert(StringsAreEqual(StringSuffix(StringLit("ABCDEF"), 0), StringLit("")));
-        Assert(StringsAreEqual(StringSuffix(StringLit(""), 1), StringLit("")));
+        Assert(StringsAreEqual(StringSuffix(StrLit("ABCDEF"), 3), StrLit("DEF")));
+        Assert(StringsAreEqual(StringSuffix(StrLit("ABCDEF"), 5), StrLit("BCDEF")));
+        Assert(StringsAreEqual(StringSuffix(StrLit("ABCDEF"), 10), StrLit("ABCDEF")));
+        Assert(StringsAreEqual(StringSuffix(StrLit("ABCDEF"), 0), StrLit("")));
+        Assert(StringsAreEqual(StringSuffix(StrLit(""), 1), StrLit("")));
         
-        Assert(StringsAreEqual(SubstrRange(StringLit("ABCDEF"), 0, 6), StringLit("ABCDEF")));
-        Assert(StringsAreEqual(SubstrRange(StringLit("ABCDEF"), 1, 3), StringLit("BC")));
-        Assert(StringsAreEqual(SubstrRange(StringLit("ABCDEF"), 3, 3), StringLit("")));
-        Assert(StringsAreEqual(SubstrRange(StringLit("ABCDEF"), 3, 4), StringLit("D")));
-        Assert(StringsAreEqual(SubstrRange(StringLit("ABCDEF"), 3, 10), StringLit("DEF")));
-        Assert(StringsAreEqual(SubstrRange(StringLit("ABCDEF"), 10, 10), StringLit("")));
-        Assert(StringsAreEqual(SubstrRange(StringLit(""), 0, 1), StringLit("")));
+        Assert(StringsAreEqual(SubstrRange(StrLit("ABCDEF"), 0, 6), StrLit("ABCDEF")));
+        Assert(StringsAreEqual(SubstrRange(StrLit("ABCDEF"), 1, 3), StrLit("BC")));
+        Assert(StringsAreEqual(SubstrRange(StrLit("ABCDEF"), 3, 3), StrLit("")));
+        Assert(StringsAreEqual(SubstrRange(StrLit("ABCDEF"), 3, 4), StrLit("D")));
+        Assert(StringsAreEqual(SubstrRange(StrLit("ABCDEF"), 3, 10), StrLit("DEF")));
+        Assert(StringsAreEqual(SubstrRange(StrLit("ABCDEF"), 10, 10), StrLit("")));
+        Assert(StringsAreEqual(SubstrRange(StrLit(""), 0, 1), StrLit("")));
         
-        Assert(StringsAreEqual(Substr(StringLit("ABCDEF"), 4, 1), StringLit("E")));
-        Assert(StringsAreEqual(Substr(StringLit("ABCDEF"), 2, 3), StringLit("CDE")));
-        Assert(StringsAreEqual(Substr(StringLit("ABCDEF"), 5, 10), StringLit("F")));
-        Assert(StringsAreEqual(Substr(StringLit("ABCDEF"), 6, 1), StringLit("")));
-        Assert(StringsAreEqual(Substr(StringLit("ABCDEF"), 1, 0), StringLit("")));
-        Assert(StringsAreEqual(Substr(StringLit(""), 0, 1), StringLit("")));
+        Assert(StringsAreEqual(Substr(StrLit("ABCDEF"), 4, 1), StrLit("E")));
+        Assert(StringsAreEqual(Substr(StrLit("ABCDEF"), 2, 3), StrLit("CDE")));
+        Assert(StringsAreEqual(Substr(StrLit("ABCDEF"), 5, 10), StrLit("F")));
+        Assert(StringsAreEqual(Substr(StrLit("ABCDEF"), 6, 1), StrLit("")));
+        Assert(StringsAreEqual(Substr(StrLit("ABCDEF"), 1, 0), StrLit("")));
+        Assert(StringsAreEqual(Substr(StrLit(""), 0, 1), StrLit("")));
         
         FreeArena(Arena);
     }
@@ -453,12 +453,12 @@ void RunTests()
         //u8 Contents[] = "lsdkfj;asdlkfj;alskdjf;alskdjf;lkasdjf;l";
         
         // Longest path that I can make a file with, 268 chars including prefix
-        //string LongFileName = StringLit("\\\\?\\C:\\files\\ABCDEFGHIJKLMNOPQRSTjkhsdkfjghsdklfjghlsdkjfhglksdjfhglksjdfhglksdjfhglkjdhsfgldksfjghlsdkfjhglkgjhsdlfkjghsldkfjghlsdkfjhglsdkjfhgldfhjgllkdjfhlkdasjhflsdkjfhlasjdhfljkasdhflkjahsdflhasdlkfjhasldkfhalsdkjfhlaskdjhflkasdhflaksdjhfakalaks0123456789abcdefgh");
+        //string LongFileName = StrLit("\\\\?\\C:\\files\\ABCDEFGHIJKLMNOPQRSTjkhsdkfjghsdklfjghlsdkjfhglksdjfhglksjdfhglksdjfhglkjdhsfgldksfjghlsdkfjhglkgjhsdlfkjghsldkfjghlsdkfjhglsdkjfhgldfhjgllkdjfhlkdasjhflsdkjfhlasjdhfljkasdhflkjahsdflhasdlkfjhasldkfhalsdkjfhlaskdjhflkasdhflaksdjhfakalaks0123456789abcdefgh");
         
         //Assert(PlatformWriteEntireFile(sizeof(Contents), Contents, LongFileName));
         
         // Doesn't work without prefix
-        //Assert(PlatformWriteEntireFile(sizeof(Contents), Contents, StringLit("C:\\files\\ABCDEFGHIJKLMNOPQRSTjkhsdkfjghsdklfjghlsdkjfhglksdjfhglksjdfhglksdjfhglkjdhsfgldksfjghlsdkfjhglkgjhsdlfkjghsldkfjghlsdkfjhglsdkjfhgldfhjgllkdjfhlkdasjhflsdkjfhlasjdhfljkasdhflkjahsdflhasdlkfjhasldkfhalsdkjfhlaskdjhflkasdhflaksdjhfakalaks0123456789abcdefgh")));
+        //Assert(PlatformWriteEntireFile(sizeof(Contents), Contents, StrLit("C:\\files\\ABCDEFGHIJKLMNOPQRSTjkhsdkfjghsdklfjghlsdkjfhglksdjfhglksjdfhglksdjfhglkjdhsfgldksfjghlsdkfjhglkgjhsdlfkjghsldkfjghlsdkfjhglsdkjfhgldfhjgllkdjfhlkdasjhflsdkjfhlasjdhfljkasdhflkjahsdflhasdlkfjhasldkfhalsdkjfhlaskdjhflkasdhflaksdjhfakalaks0123456789abcdefgh")));
         
         //Assert(PlatformDeleteFile(LongFileName));
     }
@@ -481,9 +481,9 @@ void RunTests()
         string File1Path = PushStringf(Arena, "%.*s%s", TestDir.Length, TestDir.Str, "file1.txt");
         Assert(PlatformFileExists(File1Path));
         Assert(PlatformGetFileSize(File1Path) == 94);        
-        platform_file_contents File = PlatformReadEntireFile(Arena, File1Path);
-        Assert(File.Size == 94);
-        Assert(File.Contents);
+        string File = PlatformReadEntireFile(Arena, File1Path);
+        Assert(File.Length == 94);
+        Assert(File.Str);
 #if 0
         u64 TotalSize = GB(5);
         u64 ChunkSize = TotalSize / 32;
@@ -500,7 +500,7 @@ void RunTests()
         
         PopSize(Arena, ChunkSize);
         
-        platform_file_contents LargeFile = PlatformReadEntireFile(Arena, StringLit("large.big"));
+        platform_file_contents LargeFile = PlatformReadEntireFile(Arena, StrLit("large.big"));
         
         DeleteFile("large.big");
 #endif
@@ -511,9 +511,9 @@ void RunTests()
         // If this fails it might be that the file already exists 
         Assert(PlatformWriteEntireFile(sizeof(Data), (u8 *)Data, WriteFilePath));
         
-        platform_file_contents RoundTripFile = PlatformReadEntireFile(Arena, WriteFilePath);
-        Assert(RoundTripFile.Size == sizeof(Data));
-        Assert(memcmp(Data, RoundTripFile.Contents, sizeof(Data)) == 0);
+        string RoundTripFile = PlatformReadEntireFile(Arena, WriteFilePath);
+        Assert(RoundTripFile.Length == sizeof(Data));
+        Assert(memcmp(Data, RoundTripFile.Str, sizeof(Data)) == 0);
         
         Assert(PlatformDeleteFile(WriteFilePath));
         

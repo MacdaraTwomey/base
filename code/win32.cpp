@@ -53,7 +53,7 @@ string UTF8FromUTF16(arena *Arena, wchar_t *String16, u32 String16Length)
     Assert(String16Length > 0);
     
     u32 Capacity = (String16Length * 4);
-    u8 *Buffer = PushArrayZero(Arena, Capacity, u8);
+    u8 *Buffer = PushArray(Arena, Capacity, u8);
     
     // Returns 0 on failure
     int ByteCount = WideCharToMultiByte(CP_UTF8, 0, 
@@ -70,7 +70,7 @@ wchar_t *UTF16FromUTF8(arena *Arena, u8 *String8, int String8Length)
     Assert(String8Length > 0);
     
     int Capacity = (String8Length * 2) + 2;
-    wchar_t *Buffer = PushArrayZero(Arena, Capacity, wchar_t);
+    wchar_t *Buffer = PushArray(Arena, Capacity, wchar_t);
     
     int CharacterCount = MultiByteToWideChar(CP_UTF8, 0, 
                                              (char *)String8, String8Length, 
@@ -81,12 +81,12 @@ wchar_t *UTF16FromUTF8(arena *Arena, u8 *String8, int String8Length)
 
 string PlatformGetExecutablePath(arena *Arena)
 {
-    temp_memory Scratch = GetScratch();
+    temp_arena Scratch = GetScratch();
     
     string Result = {};
     
     DWORD Capacity = 1024;
-    wchar_t *Buffer = PushArrayZero(Scratch.Arena, Capacity, wchar_t);
+    wchar_t *Buffer = PushArray(Scratch.Arena, Capacity, wchar_t);
     
     u32 Size = 0;
     for (int Tries = 0; Tries < 4; ++Tries)
@@ -99,7 +99,7 @@ string PlatformGetExecutablePath(arena *Arena)
         {
             // Truncated (Size == NullTerminatedStringSize)
             Capacity *= 2;
-            Buffer = PushArrayZero(Scratch.Arena, Capacity, wchar_t);
+            Buffer = PushArray(Scratch.Arena, Capacity, wchar_t);
         }
         else if (Size == 0)
         {
@@ -122,7 +122,7 @@ string PlatformGetExecutablePath(arena *Arena)
 // TODO: Maybe allow this to return true if the file is a directory
 bool PlatformFileExists(string FilePath)
 {
-    temp_memory Scratch = GetScratch();
+    temp_arena Scratch = GetScratch();
     
     wchar_t *FilePath16 = UTF16FromUTF8(Scratch.Arena, FilePath.Str, (int)FilePath.Length);
     DWORD Result = GetFileAttributesW(FilePath16);
@@ -138,7 +138,7 @@ u64 PlatformGetFileSize(string FilePath)
 {
     u64 Result = 0;
     
-    temp_memory Scratch = GetScratch();
+    temp_arena Scratch = GetScratch();
     
     wchar_t *FilePath16 = UTF16FromUTF8(Scratch.Arena, FilePath.Str, (int)FilePath.Length);
     
@@ -162,7 +162,7 @@ string PlatformReadEntireFile(arena *Arena, string FilePath)
 {
     string Contents = {};
     
-    temp_memory Scratch = GetScratch();
+    temp_arena Scratch = GetScratch();
     
     wchar_t *FilePath16 = UTF16FromUTF8(Scratch.Arena, FilePath.Str, (int)FilePath.Length);
     
@@ -176,8 +176,8 @@ string PlatformReadEntireFile(arena *Arena, string FilePath)
             u64 FileSize = (u64)Size.QuadPart;
             if (FileSize > 0)
             {
-                u8 *FileData = PushArray(Arena, FileSize, u8);
-                if (Contents)
+                u8 *FileData = PushArrayNoZero(Arena, FileSize, u8);
+                if (FileData)
                 {
                     u8 *Dest = FileData;
                     u64 BytesRemaining = FileSize;
@@ -222,7 +222,7 @@ string PlatformReadEntireFile(arena *Arena, string FilePath)
 // Creates a file or replaces an existing file.
 bool PlatformWriteEntireFile(u64 Size, u8 *Contents, string FilePath)
 {
-    temp_memory Scratch = GetScratch();
+    temp_arena Scratch = GetScratch();
     
     bool Success = false;
     
@@ -265,7 +265,7 @@ bool PlatformWriteEntireFile(u64 Size, u8 *Contents, string FilePath)
 // TODO: Handle deleteing directories
 bool PlatformDeleteFile(string FilePath)
 {
-    temp_memory Scratch = GetScratch();
+    temp_arena Scratch = GetScratch();
     
     wchar_t *FilePath16 = UTF16FromUTF8(Scratch.Arena, FilePath.Str, (int)FilePath.Length);
     bool Success = (DeleteFileW(FilePath16) != 0);

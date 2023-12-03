@@ -196,10 +196,11 @@ struct arena
     u32 TempCount;
 };
 
-struct temp_memory
+struct temp_arena
 {
     arena *Arena;
     u64 StartPos;
+    u32 StartTempCount;
 };
 
 enum arena_push_flags : u32
@@ -207,18 +208,6 @@ enum arena_push_flags : u32
     ArenaPushFlags_None = 0,
     ArenaPushFlags_ClearToZero = 1,
 };
-
-u32 ClearToZero()
-{
-    u32 Flags = ArenaPushFlags_ClearToZero;
-    return Flags;
-}
-
-u32 NoClear()
-{
-    u32 Flags = ArenaPushFlags_None;
-    return Flags;
-}
 
 void        MemoryCopy(u64 Size, void *Source, void *Dest);
 void        MemoryCopyOverlapped(u64 Size, void *Source, void *Dest);
@@ -237,19 +226,19 @@ void        PopToPosition(arena *Arena, u64 Pos);
 void        PopSize(arena *Arena, u64 Size);
 void        ClearArena(arena *Arena);
 
-temp_memory BeginTempMemory(arena *Arena);
-void        EndTempMemory(temp_memory TempMemory);
+temp_arena  BeginTempArena(arena *Arena);
+void        EndTempArena(temp_arena TempArena);
 void        CheckArena(arena *Arena);
-temp_memory GetScratch();
-void        ReleaseScratch(temp_memory ScratchMemory);
+temp_arena  GetScratch();
+void        ReleaseScratch(temp_arena ScratchMemory);
 
 // ## __VA_ARGS is an extension on gcc and clang, and the MSVC preprocessor will eat trailing commas when 
 // VA_ARGS is empty. But this will generate warnings with pedantic error checking.
 //#define PushArray(Arena, Count, Type, ...) (Type *)PushSize_((Arena), (Count)*sizeof(Type), alignof(Type), ##__VA_ARGS__)
 //#define PushStruct(Arena, Type, ...) (Type *)PushSize_((Arena), sizeof(Type), alignof(Type) ##__VA_ARGS__)
 
-#define PushArray(Arena, Count, Type) (Type *)PushSize_((Arena), (Count)*sizeof(Type), alignof(Type), ArenaPushFlags_None)
-#define PushArrayZero(Arena, Count, Type) (Type *)PushSize_((Arena), (Count)*sizeof(Type), alignof(Type), ArenaPushFlags_ClearToZero)
+#define PushArray(Arena, Count, Type) (Type *)PushSize_((Arena), (Count)*sizeof(Type), alignof(Type), ArenaPushFlags_ClearToZero)
+#define PushArrayNoZero(Arena, Count, Type) (Type *)PushSize_((Arena), (Count)*sizeof(Type), alignof(Type), ArenaPushFlags_None)
 #define PushStruct(Arena, Type) (Type *)PushSize_((Arena), sizeof(Type), alignof(Type), ArenaPushFlags_ClearToZero)
 
 ///////////////////////////////////////////////////////////////////////
@@ -273,20 +262,20 @@ struct string
     }
 };
 
+struct string_node
+{
+    string String;
+    string_node *Next;
+};
+
 struct string_list
 {
-    struct string_node
-    {
-        string String;
-        string_node *Next;
-    };
-    
     string_node *Head;
     string_node *Tail;
     u64 Length;
 };
 
-#define StringLit(lit) string{(u8 *)(lit), sizeof(lit) - 1} // Null terminator not included in Length
+#define StrLit(lit) string{(u8 *)(lit), sizeof(lit) - 1} // Null terminator not included in Length
 
 string CreateString(u8 *CString);
 string CreateString(u8 *StringData, u64 Length);
@@ -324,9 +313,9 @@ u64    StringFindChar(string String, u8 Char, u32 Offset=0);
 u64    StringFindLastChar(string String, u8 Char);
 u64    StringFindStr(string Haystack, string Needle);
 bool   StringContainsChar(string String, u8 Char);
+bool   StringContainsStr(string String, string Substr);
 bool   StringsAreEqual(string A, string B);
 bool   StringsAreEqualCaseInsensitive(string a, string b);
-bool   StringContainsSubstr(string String, string Substr);
 
 u64    FindLastSlash(string Path);
 void   RemoveExtension(string *File);
