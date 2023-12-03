@@ -119,6 +119,7 @@ string PlatformGetExecutablePath(arena *Arena)
     return Result;
 }
 
+// TODO: Maybe allow this to return true if the file is a directory
 bool PlatformFileExists(string FilePath)
 {
     temp_memory Scratch = GetScratch();
@@ -157,9 +158,9 @@ u64 PlatformGetFileSize(string FilePath)
     return Result;
 }
 
-platform_file_contents PlatformReadEntireFile(arena *Arena, string FilePath)
+string PlatformReadEntireFile(arena *Arena, string FilePath)
 {
-    platform_file_contents Result = {};
+    string Contents = {};
     
     temp_memory Scratch = GetScratch();
     
@@ -175,10 +176,10 @@ platform_file_contents PlatformReadEntireFile(arena *Arena, string FilePath)
             u64 FileSize = (u64)Size.QuadPart;
             if (FileSize > 0)
             {
-                u8 *Contents = PushArray(Arena, FileSize, u8);
+                u8 *FileData = PushArray(Arena, FileSize, u8);
                 if (Contents)
                 {
-                    u8 *Dest = Contents;
+                    u8 *Dest = FileData;
                     u64 BytesRemaining = FileSize;
                     while (BytesRemaining > 0)
                     {
@@ -198,8 +199,8 @@ platform_file_contents PlatformReadEntireFile(arena *Arena, string FilePath)
                     if (BytesRemaining == 0)
                     {
                         // Success
-                        Result.Contents = Contents;
-                        Result.Size = FileSize;
+                        Contents.Str = FileData;
+                        Contents.Length = FileSize;
                     }
                     else
                     {
@@ -215,7 +216,7 @@ platform_file_contents PlatformReadEntireFile(arena *Arena, string FilePath)
     
     ReleaseScratch(Scratch);
     
-    return Result;
+    return Contents;
 }
 
 // Creates a file or replaces an existing file.

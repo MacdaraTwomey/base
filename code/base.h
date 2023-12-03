@@ -231,7 +231,7 @@ u64         AlignUp(u64 Value, u64 Align);
 arena *     CreateArena(u64 ReserveSize);
 void        FreeArena(arena *Arena);
 
-void *      PushSize_(arena *Arena, u64 Size, u32 Alignment, u32 ArenaPushFlags = ClearToZero());
+void *      PushSize_(arena *Arena, u64 Size, u32 Alignment, u32 ArenaPushFlags = ArenaPushFlags_ClearToZero);
 void *      PushCopy_(arena *Arena, u64 Size, void *Source, u32 Alignment); 
 void        PopToPosition(arena *Arena, u64 Pos);
 void        PopSize(arena *Arena, u64 Size);
@@ -248,9 +248,9 @@ void        ReleaseScratch(temp_memory ScratchMemory);
 //#define PushArray(Arena, Count, Type, ...) (Type *)PushSize_((Arena), (Count)*sizeof(Type), alignof(Type), ##__VA_ARGS__)
 //#define PushStruct(Arena, Type, ...) (Type *)PushSize_((Arena), sizeof(Type), alignof(Type) ##__VA_ARGS__)
 
-#define PushArray(Arena, Count, Type) (Type *)PushSize_((Arena), (Count)*sizeof(Type), alignof(Type), NoClear())
-#define PushArrayZero(Arena, Count, Type) (Type *)PushSize_((Arena), (Count)*sizeof(Type), alignof(Type), ClearToZero())
-#define PushStruct(Arena, Type) (Type *)PushSize_((Arena), sizeof(Type), alignof(Type), ClearToZero())
+#define PushArray(Arena, Count, Type) (Type *)PushSize_((Arena), (Count)*sizeof(Type), alignof(Type), ArenaPushFlags_None)
+#define PushArrayZero(Arena, Count, Type) (Type *)PushSize_((Arena), (Count)*sizeof(Type), alignof(Type), ArenaPushFlags_ClearToZero)
+#define PushStruct(Arena, Type) (Type *)PushSize_((Arena), sizeof(Type), alignof(Type), ArenaPushFlags_ClearToZero)
 
 ///////////////////////////////////////////////////////////////////////
 // String
@@ -273,7 +273,7 @@ struct string
     }
 };
 
-struct string_builder
+struct string_list
 {
     struct string_node
     {
@@ -284,10 +284,6 @@ struct string_builder
     string_node *Head;
     string_node *Tail;
     u64 Length;
-    
-    void Append(arena *Arena, string NewString);
-    void Append(arena *Arena, char *NewString);
-    string GetString(arena *Arena);
 };
 
 #define StringLit(lit) string{(u8 *)(lit), sizeof(lit) - 1} // Null terminator not included in Length
@@ -297,9 +293,9 @@ string CreateString(u8 *StringData, u64 Length);
 
 string PushString(arena *Arena, string String);
 u8 *   PushCString(arena *Arena, u8 *String);
-u8 *PushCString(arena *Arena, string String);
-string PushFormatStringArgs(arena *Arena, char *Format, va_list Args);
-string PushFormatString(arena *Arena, char *Format, ...);
+u8 *   PushCString(arena *Arena, string String);
+string PushStringfArgs(arena *Arena, char *Format, va_list Args);
+string PushStringf(arena *Arena, char *Format, ...);
 
 u64    StringLength(u8 *CString);
 u8     StringGetChar(string String, u64 Index);
@@ -326,6 +322,7 @@ void   StringToUpper(string *String);
 u64    StringCountOccurence(string String, u8 Char);
 u64    StringFindChar(string String, u8 Char, u32 Offset=0);
 u64    StringFindLastChar(string String, u8 Char);
+u64    StringFindStr(string Haystack, string Needle);
 bool   StringContainsChar(string String, u8 Char);
 bool   StringsAreEqual(string A, string B);
 bool   StringsAreEqualCaseInsensitive(string a, string b);
@@ -335,8 +332,6 @@ u64    FindLastSlash(string Path);
 void   RemoveExtension(string *File);
 string FilenameFromPath(string Path);
 string DirectoryFromPath(string Path);
-
-string_builder CreateStringBuilder();
 
 ///////////////////////////////////////////////////////////////////////
 // Math

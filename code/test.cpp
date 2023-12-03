@@ -1,13 +1,16 @@
 
+#include "base.h"
+
 #define _USE_MATH_DEFINES
 #include <math.h>
+#include <stdio.h>
 
 // Returns non-null terminated string
 string UTF8FromUTF16(arena *Arena, wchar_t *String16, u32 String16Length);
 // Returns null-terminated string
 wchar_t *UTF16FromUTF8(arena *Arena, u8 *String8, int String8Length);
 
-
+#if BASE_OS_WINDOWS
 void PageProtection(char *Buffer, DWORD ProtectionFlags)
 {
     if (ProtectionFlags & PAGE_EXECUTE)            strcat_s(Buffer, 4096, "PAGE_EXECUTE|");
@@ -56,19 +59,19 @@ void QueryPages(arena *Arena)
     
     printf("\n");
 }
-
-struct test
-{
-    u32 A;
-    u32 B;
-    u32 C;
-    u64 D;
-};
-
+#endif
 
 void RunTests()
 {
     printf("Running tests...\n");
+
+    arena *TestDataArena = CreateArena(GB(1));
+    
+    string ExePath = PlatformGetExecutablePath(TestDataArena);
+    string NMinus2Dirs = DirectoryFromPath(StringChop(DirectoryFromPath(ExePath), 1));
+    string TestDir = PushStringf(TestDataArena, "%.*s%s", NMinus2Dirs.Length, NMinus2Dirs.Str, "test/");
+
+    printf("%.*s\n", (int)TestDir.Length, TestDir.Str);
 #if 0
     {
         arena *Arena = CreateArena(GB(1));
@@ -90,6 +93,14 @@ void RunTests()
 #endif
     
 #if 0
+    struct test
+    {
+        u32 A;
+        u32 B;
+        u32 C;
+        u64 D;
+    };
+
     {
         arena *Arena = CreateArena(GB(1));
         test *Test = PushArray(Arena, 2, test);
@@ -266,7 +277,7 @@ void RunTests()
         arena *Arena = CreateArena(GB(1));
         
         const char *conststr = "0123456789";
-        string NumberString = PushFormatString(Arena, (char *)"%s %u ABCDEF, !%f", conststr, 2342u, 0.0002342234f);
+        string NumberString = PushStringf(Arena, (char *)"%s %u ABCDEF, !%f", conststr, 2342u, 0.0002342234f);
         
         string StringUpper = StringLit("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
         string StringLower = StringLit("abcdefghijklmnopqrstuvwxyz");
@@ -300,7 +311,43 @@ void RunTests()
         
         u64 Index4 = StringFindLastChar(StringLit(""), '6');
         Assert(Index4 == 0);
+
+
+        string Haystack1 = StringLit("THE CAT end");
+        u64 Pos1 = StringFindStr(Haystack1, StringLit("CAT"));
+        Assert(Pos1 == 4);
         
+        u64 Pos2 = StringFindStr(Haystack1, StringLit("CATE"));
+        Assert(Pos2 == Haystack1.Length);
+
+        u64 Pos3 = StringFindStr(Haystack1, StringLit(""));
+        Assert(Pos3 == Haystack1.Length);
+
+        u64 Pos4 = StringFindStr(StringLit(""), StringLit(""));
+        Assert(Pos4 == 0);
+
+        u64 Pos5 = StringFindStr(StringLit(""), StringLit("ADE"));
+        Assert(Pos5 == 0);
+
+        string Haystack2 = StringLit("LE CHAT");
+        
+        u64 Pos6 = StringFindStr(Haystack2, StringLit("CHATE"));
+        Assert(Pos6 == Haystack2.Length);
+
+        u64 Pos7 = StringFindStr(Haystack2, StringLit("LE CHATE"));
+        Assert(Pos7 == Haystack2.Length);
+
+        u64 Pos8 = StringFindStr(Haystack2, StringLit("LE CHAT"));
+        Assert(Pos8 == 0);
+
+        u64 Pos9 = StringFindStr(Haystack2, StringLit("T"));
+        Assert(Pos9 == 6);
+
+        string Haystack3 = StringLit("CA cat CATeCATCATE ");
+        u64 Pos10 = StringFindStr(Haystack3, StringLit("CATE"));
+        Assert(Pos10 == 14);
+
+
         Assert(StringContainsChar(StringLit("ABC"), 'B'));
         Assert(StringContainsChar(StringLit("B"), 'B'));
         Assert(!StringContainsChar(StringLit(""), 'B'));
@@ -361,7 +408,7 @@ void RunTests()
         
         temp_memory Scratch = GetScratch();
         
-        string_builder Builder = CreateStringBuilder();
+        string_list Builder = CreateStringBuilder();
         Builder.Append(Scratch.Arena, (char *)"This is the first string. ");
         Builder.Append(Scratch.Arena, StringLit("This is the 2nd string."));
         Builder.Append(Scratch.Arena, StringLit("The last string."));
@@ -418,25 +465,25 @@ void RunTests()
     {
         arena *Arena = CreateArena(GB(10));
         
-        
+#if BASE_OS_WINDOWS
         string String8 = UTF8FromUTF16(Arena, (wchar_t *)L"Hellow", 6);
         wchar_t *String16 = UTF16FromUTF8(Arena, (u8 *)"Hellow", 6);
         (void)String16;
-        
+#endif
+
         string ExePath = PlatformGetExecutablePath(Arena);
-        Assert(StringsAreEqual(ExePath, StringLit("C:\\dev\\projects\\base\\build\\base_test.exe")));
+        Assert(ExePath.Length > 0);
         
-        Assert(PlatformFileExists(StringLit("C:/dev/projects/base/build/base_test.exe")));
-        Assert(PlatformFileExists(StringLit("C:\\dev\\projects\\base\\build\\base_test.exe")));
-        Assert(PlatformFileExists(StringLit("C:\\dev\\projects\\base\\build\\BASE_TEST.EXE")));
-        Assert(!PlatformFileExists(StringLit("C:\\dev\\projects\\base\\build\\")));
-        Assert(!PlatformFileExists(StringLit("C:\\dev\\projects\\base\\build")));
-        Assert(!PlatformFileExists(StringLit("C:\\fake\\fakey")));
+        // TestDir is a directory not a file so shouldn't exist
+        Assert(!PlatformFileExists(TestDir));
+        Assert(!PlatformFileExists(PushStringf(Arena, "%.*s%s", TestDir.Length, TestDir.Str, "NON_EXISTENT_FILE")));
         
-        Assert(PlatformFileExists(StringLit("C:/dev/projects/base/test/file1.txt")));
-        Assert(PlatformGetFileSize(StringLit("C:/dev/projects/base/test/file1.txt")) == 94);        
-        platform_file_contents File = PlatformReadEntireFile(Arena, StringLit("C:/dev/projects/base/test/file1.txt"));
-        
+        string File1Path = PushStringf(Arena, "%.*s%s", TestDir.Length, TestDir.Str, "file1.txt");
+        Assert(PlatformFileExists(File1Path));
+        Assert(PlatformGetFileSize(File1Path) == 94);        
+        platform_file_contents File = PlatformReadEntireFile(Arena, File1Path);
+        Assert(File.Size == 94);
+        Assert(File.Contents);
 #if 0
         u64 TotalSize = GB(5);
         u64 ChunkSize = TotalSize / 32;
@@ -459,14 +506,16 @@ void RunTests()
 #endif
         
         u64 Data[] = { 0x3234234, 0x23423423, 0x0349538450, 0x93213, 0x34882349 };
-        Assert(PlatformWriteEntireFile(sizeof(Data), (u8 *)Data,
-                                       StringLit("C:/dev/projects/base/build/writefile.test")));
+        string WriteFilePath = PushStringf(Arena, "%.*s%s", TestDir.Length, TestDir.Str, "writefile.test");
+
+        // If this fails it might be that the file already exists 
+        Assert(PlatformWriteEntireFile(sizeof(Data), (u8 *)Data, WriteFilePath));
         
-        platform_file_contents RoundTripFile = PlatformReadEntireFile(Arena, StringLit("C:/dev/projects/base/build/writefile.test"));
+        platform_file_contents RoundTripFile = PlatformReadEntireFile(Arena, WriteFilePath);
         Assert(RoundTripFile.Size == sizeof(Data));
         Assert(memcmp(Data, RoundTripFile.Contents, sizeof(Data)) == 0);
         
-        Assert(PlatformDeleteFile(StringLit("C:/dev/projects/base/build/writefile.test")));
+        Assert(PlatformDeleteFile(WriteFilePath));
         
         FreeArena(Arena);
     }
@@ -502,4 +551,6 @@ void RunTests()
         
         static_assert(Pi32 == (f32)M_PI, "Pi32 not equal to M_PI");
     }
+
+    FreeArena(TestDataArena);
 }

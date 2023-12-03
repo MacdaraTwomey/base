@@ -1,11 +1,5 @@
 
-Alchemy game
-
-
-
 TODO: 
-* Better platform file handling
-* Arenas are bootstrapped
-* Scratch arena
-* use string type in platform layer
-* Hot reloading?
+* Better platform file handling (handle api, error accumulation)
+* Multiple scratch arenas in thread local, w/ conflicts
+* date and time 

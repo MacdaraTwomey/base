@@ -347,7 +347,7 @@ void BaseAssertPrint_(const char *Format, ...)
     fflush(stdout);
 }
 
-string PushFormatStringArgs(arena *Arena, char *Format, va_list Args)
+string PushStringfArgs(arena *Arena, char *Format, va_list Args)
 {
     u64 Length = 0;
     u64 Capacity = 1024;
@@ -399,11 +399,11 @@ string PushFormatStringArgs(arena *Arena, char *Format, va_list Args)
 }
 
 
-string PushFormatString(arena *Arena, char *Format, ...)
+string PushStringf(arena *Arena, char *Format, ...)
 {
     va_list Args;
     va_start (Args, Format);
-    string Result = PushFormatStringArgs(Arena, Format, Args);
+    string Result = PushStringfArgs(Arena, Format, Args);
     va_end (Args);
     
     return Result;
@@ -573,6 +573,39 @@ u64 StringFindLastChar(string String, u8 Char)
     return Position;
 }
 
+
+u64 StringFindStr(string Haystack, string Needle)
+{
+    u64 Position = Haystack.Length;
+    
+    if (Needle.Length > 0 && Haystack.Length >= Needle.Length) 
+    {
+        for (u64 i = 0; i < Haystack.Length - Needle.Length + 1; ++i)
+        {
+            if (Needle.Str[0] == Haystack.Str[i])
+            {
+                bool Found = true;
+                for (u64 j = 1; j < Needle.Length; ++j)
+                {
+                    if (Needle.Str[j] != Haystack.Str[i + j])
+                    {
+                        Found = false;
+                        break;
+                    }
+                }
+                
+                if (Found)
+                {
+                    Position = i;
+                    break;
+                }
+            }
+        }
+    }
+    
+    return Position;
+}
+
 bool StringContainsChar(string String, u8 Char)
 {
     return StringFindChar(String, Char) < String.Length;
@@ -646,7 +679,7 @@ bool StringContainsSubstr(string String, string Substr)
 u64 StringFindLastSlash(string Path)
 {
     u64 Position = Path.Length;
-    for (u64 i = Path.Length - 1; i != static_cast<u64>(-1); --i)
+    for (u64 i = Path.Length - 1; i != (u64)-1; --i)
     {
         if (IsSlash(Path.Str[i]))
         {
@@ -689,16 +722,7 @@ string DirectoryFromPath(string Path)
     return Directory;
 }
 
-string_builder CreateStringBuilder()
-{
-    string_builder Result = {};
-    Result.Head = nullptr;
-    Result.Tail = nullptr;
-    Result.Length = 0;
-    return Result;
-}
-
-void string_builder::Append(arena *Arena, string String)
+void Append(arena *Arena, string_list *list, string String)
 {
     string_node *Node = PushStruct(Arena, string_node);
     Node->String = PushString(Arena, String);
@@ -717,12 +741,12 @@ void string_builder::Append(arena *Arena, string String)
     Length += String.Length;
 }
 
-void string_builder::Append(arena *Arena, char *String)
+void string_list::Append(arena *Arena, char *String)
 {
     Append(Arena, CreateString((u8 *)String));
 }
 
-string string_builder::GetString(arena *Arena)
+string string_list::GetString(arena *Arena)
 {
     u8 *StringMemory = PushArray(Arena, Length, u8);
     
