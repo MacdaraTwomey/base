@@ -229,7 +229,7 @@ void        ClearArena(arena *Arena);
 temp_arena  BeginTempArena(arena *Arena);
 void        EndTempArena(temp_arena TempArena);
 void        CheckArena(arena *Arena);
-temp_arena  GetScratch();
+temp_arena  GetScratch(arena **Conflicts, u32 ConflictCount);
 void        ReleaseScratch(temp_arena ScratchMemory);
 
 // ## __VA_ARGS is an extension on gcc and clang, and the MSVC preprocessor will eat trailing commas when 
@@ -321,6 +321,11 @@ u64    FindLastSlash(string Path);
 void   RemoveExtension(string *File);
 string FilenameFromPath(string Path);
 string DirectoryFromPath(string Path);
+
+void StringListAppend(arena *Arena, string_list *List, string String);
+void StringListAppend(arena *Arena, string_list *List, char *String);
+string StringListJoin(arena *Arena, string_list *List);
+string_list StringListSplit(arena *Arena, string String, string Splits);
 
 ///////////////////////////////////////////////////////////////////////
 // Math

@@ -184,7 +184,7 @@ void *PushSize_(arena *Arena, u64 Size, u32 Alignment, u32 ArenaPushFlags)
 
 void *PushCopy_(arena *Arena, u64 Size, void *Source, u32 Alignment)
 {
-    void *Memory = PushSize_(Arena, Size, Alignment, NoClear());
+    void *Memory = PushSize_(Arena, Size, Alignment, ArenaPushFlags_None);
     MemoryCopy(Size, Source, Memory);
     return Memory;
 }
@@ -785,30 +785,44 @@ string StringListJoin(arena *Arena, string_list *List)
         CopiedLength += Node->String.Length;
     }
     
-    Assert(CopiedLength == List->Length);
-    
-    string Result;
+    string Result = {};
     Result.Str = StringMemory;
     Result.Length = CopiedLength;
     return Result;
 }
 
 
-string StringListSplit(arena *Arena, string_list *List)
+string_list StringListSplit(arena *Arena, string String, string Splits)
 {
-    u8 *StringMemory = PushArrayNoZero(Arena, List->Length, u8);
-    
-    u64 CopiedLength = 0;
-    for (string_node *Node = List->Head; Node; Node = Node->Next)
+    string_list List = {};
+    u64 StartIndex = 0;
+    u64 At = 0;
+    for (; At < String.Length; ++At)
     {
-        MemoryCopy(Node->String.Length, Node->String.Str, StringMemory + CopiedLength);
-        CopiedLength += Node->String.Length;
+        bool MatchedSplit = false;
+        for (u64 i = 0; i < Splits.Length; ++i)
+        {
+            if (String.Str[At] == Splits[i]) 
+            {
+                MatchedSplit = true;
+                break;
+            }
+        }
+
+        if (MatchedSplit) 
+        {
+            if (StartIndex < At)
+            {
+                StringListAppend(Arena, &List, SubstrRange(String, StartIndex, At));
+            }
+            StartIndex = At + 1;
+        }
     }
-    
-    Assert(CopiedLength == List->Length);
-    
-    string Result;
-    Result.Str = StringMemory;
-    Result.Length = CopiedLength;
-    return Result;
+
+    if (StartIndex < At) 
+    {
+        StringListAppend(Arena, &List, SubstrRange(String, StartIndex, String.Length));
+    }
+
+    return List;
 }

@@ -61,6 +61,32 @@ void QueryPages(arena *Arena)
 }
 #endif
 
+// TODO: What am I testing here...
+void NestedScratch(u32 Depth)
+{
+    if (Depth == 8)
+    {
+        return;
+    }
+
+    temp_arena Scratch = GetScratch(0, 0);
+    u32 *Value = PushArray(Scratch.Arena, 10, u32);
+    for (u32 i = 0; i < 10; ++i) 
+    {
+        Value[i] = i + (Depth * 10);
+    }
+
+    NestedScratch(Depth + 1);
+
+    for (u32 i = 0; i < 10; ++i) 
+    {
+        Assert(Value[i] == i + (Depth * 10));
+    }
+
+    ReleaseScratch(Scratch);
+    return;
+}
+
 void RunTests()
 {
     printf("Running tests...\n");
@@ -230,7 +256,7 @@ void RunTests()
         
         u64 Pos = Arena->Pos;
         
-        f32 *F32Array1 = (f32 *)PushSize_(Arena, MB(40), 4, NoClear());
+        f32 *F32Array1 = (f32 *)PushSize_(Arena, MB(40), 4, ArenaPushFlags_None);
         f32 *F32Array2 = (f32 *)PushCopy_(Arena, MB(40), F32Array1, alignof(f32));
         MemoryZero(MB(40), F32Array1);
         MemoryZero(MB(40), F32Array2);
@@ -271,6 +297,12 @@ void RunTests()
         Assert(PushArray(Arena, MB(100), u8));
         
         FreeArena(Arena);
+    }
+
+    {
+        NestedScratch(0);
+
+        // TODO: Test with conflicts
     }
     
     {
@@ -409,14 +441,21 @@ void RunTests()
         temp_arena Scratch = GetScratch();
         
         string_list List = {};
-        StringListAppend(Scratch.Arena, &List, (char *)"This is the first string. ");
-        StringListAppend(Scratch.Arena, &List, StrLit("This is the 2nd string."));
-        StringListAppend(Scratch.Arena, &List, StrLit("The last string."));
-        StringListAppend(Scratch.Arena, &List, StrLit("\0"));
+        StringListAppend(Scratch.Arena, &List, (char *)"Hello");
+        StringListAppend(Scratch.Arena, &List, StrLit(" World I "));
+        StringListAppend(Scratch.Arena, &List, StrLit(""));
+        StringListAppend(Scratch.Arena, &List, StrLit("Am "));
+        StringListAppend(Scratch.Arena, &List, StrLit("Here."));
         
-        string WholeString = StringListJoin(Arena, &List);
-        
+        string WholeString = StringListJoin(Scratch.Arena, &List);
+        Assert(StringsAreEqual(WholeString, StrLit("Hello World I Am Here.")));
+
+        string_list List2 = {};
+        Assert(StringsAreEqual(StringListJoin(Scratch.Arena, &List), StrLit("")));
+
         ReleaseScratch(Scratch);
+
+
         
         Assert(StringsAreEqual(StringPrefix(StrLit("ABCDEF"), 3), StrLit("ABC")));
         Assert(StringsAreEqual(StringPrefix(StrLit("ABCDEF"), 6), StrLit("ABCDEF")));
