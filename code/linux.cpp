@@ -13,11 +13,11 @@
 // If we do this, then we can use access().
 bool PlatformFileExists(string FilePath)
 {
-    temp_arena Scratch = GetScratch(0, 0);
+    temp_arena Scratch = GetScratch();
     u8 *PathZ  = PushCString(Scratch.Arena, FilePath);
     
     bool Exists = false;
-
+    
     struct stat64 Info = {};
     if (stat64((char *)PathZ, &Info) == 0)
     {

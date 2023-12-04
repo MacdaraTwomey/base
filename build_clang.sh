@@ -64,7 +64,7 @@ fi
 pushd build > /dev/null
 
 # -fdiagnostics-color forces colour even when piping to sed
-CMD="$CC -o base_test.exe -g -Wall -pedantic-errors -fdiagnostics-color -std=c++14 $DISABLED_WARNINGS $SOURCE $FLAGS -I $INCLUDE $LIBS"
+CMD="$CC -o base_test.exe -g -Wall -pedantic-errors -std=c++17 $DISABLED_WARNINGS $SOURCE $FLAGS -I $INCLUDE $LIBS"
 echo $CMD
 
 if [[ $LINUX_OUTPUT_PATH_TYPE == "win-path" ]]

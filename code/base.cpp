@@ -264,7 +264,8 @@ void CheckArena(arena *Arena)
     Assert(Arena->TempCount == 0);
 }
 
-temp_arena GetScratch(arena **Conflicts, u32 ConflictCount)
+temp_arena GetScratchImpl(arena **Conflicts, u32 ConflictCount)
+//temp_arena GetScratchImpl(std::array<arena *> &Array, u32 Count)
 {
     if (GlobalScratchArenaPool[0] == 0)
     {
@@ -284,7 +285,7 @@ temp_arena GetScratch(arena **Conflicts, u32 ConflictCount)
                 break;
             }
         }
-
+        
         if (!Arena) 
         {
             Arena = GlobalScratchArenaPool[1];
@@ -298,10 +299,26 @@ temp_arena GetScratch(arena **Conflicts, u32 ConflictCount)
             }
         }
     }
-
+    
     Assert(Arena && "Unable to get non-conflicting arena");
     
     return BeginTempArena(Arena);
+}
+
+temp_arena GetScratch()
+{
+    return GetScratchImpl(0, 0);
+}
+
+temp_arena GetScratch(arena *Arena)
+{
+    return GetScratchImpl(&Arena, 1);
+}
+
+temp_arena GetScratch(arena *Arena1, arena *Arena2)
+{
+    arena *ArenaArray[2] = {Arena1, Arena2};
+    return GetScratchImpl(ArenaArray, 2);
 }
 
 void ReleaseScratch(temp_arena ScratchMemory)
@@ -808,7 +825,7 @@ string_list StringListSplit(arena *Arena, string String, string Splits)
                 break;
             }
         }
-
+        
         if (MatchedSplit) 
         {
             if (StartIndex < At)
@@ -818,11 +835,11 @@ string_list StringListSplit(arena *Arena, string String, string Splits)
             StartIndex = At + 1;
         }
     }
-
+    
     if (StartIndex < At) 
     {
         StringListAppend(Arena, &List, SubstrRange(String, StartIndex, String.Length));
     }
-
+    
     return List;
 }

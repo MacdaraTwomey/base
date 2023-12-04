@@ -229,8 +229,17 @@ void        ClearArena(arena *Arena);
 temp_arena  BeginTempArena(arena *Arena);
 void        EndTempArena(temp_arena TempArena);
 void        CheckArena(arena *Arena);
-temp_arena  GetScratch(arena **Conflicts, u32 ConflictCount);
 void        ReleaseScratch(temp_arena ScratchMemory);
+
+// We overload based on number of arguments passed because because C++ doesn't have C's compound initializers.
+// I can't figure out a nice way to do it with __VA_ARGS__, and a don't want to use va_list (which I'm not sure
+// would work nice with zero arguements, because you need a way to pass in argument count).
+temp_arena  GetScratch();
+temp_arena  GetScratch(arena *Arena);
+temp_arena  GetScratch(arena *Arena1, arena *Arena2);
+temp_arena  GetScratchImpl(arena **Conflicts, u32 ConflictCount);
+
+//#define GetScratch(...) GetScratchImpl(std::array<arena *>{__VA_ARGS__}, std::array.<arena *>{__VA_ARGS__}.size)
 
 // ## __VA_ARGS is an extension on gcc and clang, and the MSVC preprocessor will eat trailing commas when 
 // VA_ARGS is empty. But this will generate warnings with pedantic error checking.

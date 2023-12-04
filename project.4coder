@@ -28,7 +28,7 @@ commands = {
     
     // WSL build
     .build_clang_linux = { .out = "*compilation*", .footer_panel = true, .save_dirty_files = true,         
-        .win = "bash build_clang.sh linux"
+        .win = "bash build_clang.sh linux win-path"
     },
     
     .build_msvc = { .out = "*compilation*", .footer_panel = true, .save_dirty_files = true,

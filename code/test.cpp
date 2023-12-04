@@ -61,6 +61,8 @@ void QueryPages(arena *Arena)
 }
 #endif
 
+
+
 // TODO: What am I testing here...
 void NestedScratch(u32 Depth)
 {
@@ -68,21 +70,21 @@ void NestedScratch(u32 Depth)
     {
         return;
     }
-
-    temp_arena Scratch = GetScratch(0, 0);
+    
+    temp_arena Scratch = GetScratch();
     u32 *Value = PushArray(Scratch.Arena, 10, u32);
     for (u32 i = 0; i < 10; ++i) 
     {
         Value[i] = i + (Depth * 10);
     }
-
+    
     NestedScratch(Depth + 1);
-
+    
     for (u32 i = 0; i < 10; ++i) 
     {
         Assert(Value[i] == i + (Depth * 10));
     }
-
+    
     ReleaseScratch(Scratch);
     return;
 }
@@ -90,13 +92,13 @@ void NestedScratch(u32 Depth)
 void RunTests()
 {
     printf("Running tests...\n");
-
+    
     arena *TestDataArena = CreateArena(GB(1));
     
     string ExePath = PlatformGetExecutablePath(TestDataArena);
     string NMinus2Dirs = DirectoryFromPath(StringChop(DirectoryFromPath(ExePath), 1));
     string TestDir = PushStringf(TestDataArena, "%.*s%s", NMinus2Dirs.Length, NMinus2Dirs.Str, "test/");
-
+    
     printf("%.*s\n", (int)TestDir.Length, TestDir.Str);
 #if 0
     {
@@ -126,7 +128,7 @@ void RunTests()
         u32 C;
         u64 D;
     };
-
+    
     {
         arena *Arena = CreateArena(GB(1));
         test *Test = PushArray(Arena, 2, test);
@@ -298,10 +300,10 @@ void RunTests()
         
         FreeArena(Arena);
     }
-
+    
     {
         NestedScratch(0);
-
+        
         // TODO: Test with conflicts
     }
     
@@ -343,43 +345,43 @@ void RunTests()
         
         u64 Index4 = StringFindLastChar(StrLit(""), '6');
         Assert(Index4 == 0);
-
-
+        
+        
         string Haystack1 = StrLit("THE CAT end");
         u64 Pos1 = StringFindStr(Haystack1, StrLit("CAT"));
         Assert(Pos1 == 4);
         
         u64 Pos2 = StringFindStr(Haystack1, StrLit("CATE"));
         Assert(Pos2 == Haystack1.Length);
-
+        
         u64 Pos3 = StringFindStr(Haystack1, StrLit(""));
         Assert(Pos3 == Haystack1.Length);
-
+        
         u64 Pos4 = StringFindStr(StrLit(""), StrLit(""));
         Assert(Pos4 == 0);
-
+        
         u64 Pos5 = StringFindStr(StrLit(""), StrLit("ADE"));
         Assert(Pos5 == 0);
-
+        
         string Haystack2 = StrLit("LE CHAT");
         
         u64 Pos6 = StringFindStr(Haystack2, StrLit("CHATE"));
         Assert(Pos6 == Haystack2.Length);
-
+        
         u64 Pos7 = StringFindStr(Haystack2, StrLit("LE CHATE"));
         Assert(Pos7 == Haystack2.Length);
-
+        
         u64 Pos8 = StringFindStr(Haystack2, StrLit("LE CHAT"));
         Assert(Pos8 == 0);
-
+        
         u64 Pos9 = StringFindStr(Haystack2, StrLit("T"));
         Assert(Pos9 == 6);
-
+        
         string Haystack3 = StrLit("CA cat CATeCATCATE ");
         u64 Pos10 = StringFindStr(Haystack3, StrLit("CATE"));
         Assert(Pos10 == 14);
-
-
+        
+        
         Assert(StringContainsChar(StrLit("ABC"), 'B'));
         Assert(StringContainsChar(StrLit("B"), 'B'));
         Assert(!StringContainsChar(StrLit(""), 'B'));
@@ -449,13 +451,13 @@ void RunTests()
         
         string WholeString = StringListJoin(Scratch.Arena, &List);
         Assert(StringsAreEqual(WholeString, StrLit("Hello World I Am Here.")));
-
+        
         string_list List2 = {};
         Assert(StringsAreEqual(StringListJoin(Scratch.Arena, &List), StrLit("")));
-
+        
         ReleaseScratch(Scratch);
-
-
+        
+        
         
         Assert(StringsAreEqual(StringPrefix(StrLit("ABCDEF"), 3), StrLit("ABC")));
         Assert(StringsAreEqual(StringPrefix(StrLit("ABCDEF"), 6), StrLit("ABCDEF")));
@@ -509,7 +511,7 @@ void RunTests()
         wchar_t *String16 = UTF16FromUTF8(Arena, (u8 *)"Hellow", 6);
         (void)String16;
 #endif
-
+        
         string ExePath = PlatformGetExecutablePath(Arena);
         Assert(ExePath.Length > 0);
         
@@ -546,7 +548,7 @@ void RunTests()
         
         u64 Data[] = { 0x3234234, 0x23423423, 0x0349538450, 0x93213, 0x34882349 };
         string WriteFilePath = PushStringf(Arena, "%.*s%s", TestDir.Length, TestDir.Str, "writefile.test");
-
+        
         // If this fails it might be that the file already exists 
         Assert(PlatformWriteEntireFile(sizeof(Data), (u8 *)Data, WriteFilePath));
         
@@ -590,6 +592,6 @@ void RunTests()
         
         static_assert(Pi32 == (f32)M_PI, "Pi32 not equal to M_PI");
     }
-
+    
     FreeArena(TestDataArena);
 }
