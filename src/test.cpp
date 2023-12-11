@@ -61,10 +61,14 @@ void QueryPages(arena *Arena)
 }
 #endif
 
+// func0 0
+// a
+// fun1 a
+// b
+// fun2 b
+// a
 
-
-// TODO: What am I testing here...
-void NestedScratch(u32 Depth)
+void NestedScratchReuseSame(u32 Depth)
 {
     if (Depth == 8)
     {
@@ -78,7 +82,7 @@ void NestedScratch(u32 Depth)
         Value[i] = i + (Depth * 10);
     }
     
-    NestedScratch(Depth + 1);
+    NestedScratchReuseSame(Depth + 1);
     
     for (u32 i = 0; i < 10; ++i) 
     {
@@ -89,6 +93,32 @@ void NestedScratch(u32 Depth)
     return;
 }
 
+void NestedScratchReuseAlternating(u32 Depth, arena *Arena)
+{
+    if (Depth == 8)
+    {
+        return;
+    }
+    
+    temp_arena Scratch = GetScratch(Arena);
+    u32 *Value = PushArray(Scratch.Arena, 10, u32);
+    for (u32 i = 0; i < 10; ++i) 
+    {
+        Value[i] = i + (Depth * 10);
+    }
+    
+    NestedScratchReuseAlternating(Depth + 1, Scratch.Arena);
+    
+    for (u32 i = 0; i < 10; ++i) 
+    {
+        Assert(Value[i] == i + (Depth * 10));
+    }
+    
+    ReleaseScratch(Scratch);
+    return;
+}
+
+
 void RunTests()
 {
     printf("Running tests...\n");
@@ -97,9 +127,8 @@ void RunTests()
     
     string ExePath = PlatformGetExecutablePath(TestDataArena);
     string NMinus2Dirs = DirectoryFromPath(StringChop(DirectoryFromPath(ExePath), 1));
-    string TestDir = PushStringf(TestDataArena, "%.*s%s", NMinus2Dirs.Length, NMinus2Dirs.Str, "test/");
+    string TestDir = PushStringf(TestDataArena, "%.*s%s", (int)NMinus2Dirs.Length, NMinus2Dirs.Str, "test/");
     
-    printf("%.*s\n", (int)TestDir.Length, TestDir.Str);
 #if 0
     {
         arena *Arena = CreateArena(GB(1));
@@ -277,8 +306,8 @@ void RunTests()
         u8 *Array5 = PushArray(Arena, 100, u8);
         MemoryZero(100, Array5);
         
-        EndTempArena(TempMemory1); // In wrong order
         EndTempArena(TempMemory2);
+        EndTempArena(TempMemory1); 
         
         temp_arena Scratch = GetScratch();
         
@@ -302,7 +331,8 @@ void RunTests()
     }
     
     {
-        NestedScratch(0);
+        NestedScratchReuseSame(0);
+        NestedScratchReuseAlternating(0, 0);
         
         // TODO: Test with conflicts
     }
@@ -453,7 +483,7 @@ void RunTests()
         Assert(StringsAreEqual(WholeString, StrLit("Hello World I Am Here.")));
         
         string_list List2 = {};
-        Assert(StringsAreEqual(StringListJoin(Scratch.Arena, &List), StrLit("")));
+        Assert(StringsAreEqual(StringListJoin(Scratch.Arena, &List2), StrLit("")));
         
         ReleaseScratch(Scratch);
         
@@ -517,9 +547,9 @@ void RunTests()
         
         // TestDir is a directory not a file so shouldn't exist
         Assert(!PlatformFileExists(TestDir));
-        Assert(!PlatformFileExists(PushStringf(Arena, "%.*s%s", TestDir.Length, TestDir.Str, "NON_EXISTENT_FILE")));
+        Assert(!PlatformFileExists(PushStringf(Arena, "%.*s%s", (int)TestDir.Length, TestDir.Str, "NON_EXISTENT_FILE")));
         
-        string File1Path = PushStringf(Arena, "%.*s%s", TestDir.Length, TestDir.Str, "file1.txt");
+        string File1Path = PushStringf(Arena, "%.*s%s", (int)TestDir.Length, TestDir.Str, "file1.txt");
         Assert(PlatformFileExists(File1Path));
         Assert(PlatformGetFileSize(File1Path) == 94);        
         string File = PlatformReadEntireFile(Arena, File1Path);
@@ -547,7 +577,7 @@ void RunTests()
 #endif
         
         u64 Data[] = { 0x3234234, 0x23423423, 0x0349538450, 0x93213, 0x34882349 };
-        string WriteFilePath = PushStringf(Arena, "%.*s%s", TestDir.Length, TestDir.Str, "writefile.test");
+        string WriteFilePath = PushStringf(Arena, "%.*s%s", (int)TestDir.Length, TestDir.Str, "writefile.test");
         
         // If this fails it might be that the file already exists 
         Assert(PlatformWriteEntireFile(sizeof(Data), (u8 *)Data, WriteFilePath));

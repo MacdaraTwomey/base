@@ -8,7 +8,7 @@
             "name": "Debug from linux",
             "type": "lldb",
             "request": "launch",
-            "program": "${workspaceFolder}/build/base_test.exe",
+            "program": "${workspaceFolder}/build/test.exe",
             "cwd": "${workspaceFolder}",
         },
         {
@@ -17,7 +17,7 @@
             "name": "Debug from windows",
             "type": "cppvsdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/base_test.exe",
+            "program": "${workspaceFolder}/build/test.exe",
             "symbolSearchPath": "${workspaceFolder}/code",
             "console": false,
             "visualizerFile": "${workspaceFolder}/my.natvis",

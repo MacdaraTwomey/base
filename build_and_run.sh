@@ -2,14 +2,14 @@
 
 ROOT=$PWD
 
-$ROOT/build.sh
+$ROOT/build_clang.sh win
 
 STATUS=$?
 
 if test $STATUS -eq 0 
 then
     echo 'Success'
-    $ROOT/build/base_test.exe
+    $ROOT/build/test.exe
 else
    echo 'Failure'
 fi

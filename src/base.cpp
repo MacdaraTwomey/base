@@ -11,7 +11,6 @@
 //
 
 // TODO: Make thread local
-// TODO: Do we want a pool of possible scratch arenas
 static arena *GlobalScratchArenaPool[2] = {};
 
 #define ARENA_HEADER_SIZE 64
@@ -107,12 +106,13 @@ void FreeArena(arena *Arena)
     PlatformMemoryFree(Arena->Base, Arena->Reserve);
 }
 
+// If Size is 0, we return a correctly aligned pointer.
 void *PushSize_(arena *Arena, u64 Size, u32 Alignment, u32 ArenaPushFlags)
 {
+    
     // It is not really necessary to properly align allocations on modern x64 processors (unless you are doing SIMD, or possibly on ARM), 
     // It may be undefined behaviour to access an unaligned type, but we are already ignoring strict aliasing.
     
-    Assert(Size > 0);
     Assert(Alignment > 0);
     Assert(IsPowerOfTwo(Alignment));
     
@@ -243,7 +243,7 @@ temp_arena BeginTempArena(arena *Arena)
     temp_arena Temp = {};
     Temp.Arena = Arena;
     Temp.StartPos = Arena->Pos; 
-    Temp.StartTempCount = Arena->TempCount;
+    Temp.TempIndex = Arena->TempCount;
     
     Arena->TempCount += 1;
     
@@ -253,7 +253,11 @@ temp_arena BeginTempArena(arena *Arena)
 void EndTempArena(temp_arena TempArena)
 {
     arena *Arena = TempArena.Arena;
-    Assert(Arena->TempCount == TempArena.StartTempCount);
+    // NOTE: This forces GetScratch() ReleaseScratch() pairs to be matched
+    // You can't call ReleaseScratch() on a Arena lower on the stack to avoid releasing
+    // on higher on the stack.
+    // NOTE: Lets wait and see if this is useful or not.
+    Assert(Arena->TempCount-1 == TempArena.TempIndex);
     
     PopToPosition(Arena, TempArena.StartPos);
     Arena->TempCount -= 1;
@@ -270,8 +274,8 @@ temp_arena GetScratchImpl(arena **Conflicts, u32 ConflictCount)
     if (GlobalScratchArenaPool[0] == 0)
     {
         static_assert(ArrayCount(GlobalScratchArenaPool) == 2, "Must be only two scratch arenas");
-        GlobalScratchArenaPool[0] = CreateArena(GB(8));
-        GlobalScratchArenaPool[1] = CreateArena(GB(8));
+        GlobalScratchArenaPool[0] = CreateArena(GB(16));
+        GlobalScratchArenaPool[1] = CreateArena(GB(16));
     }
     
     arena *Arena = GlobalScratchArenaPool[0];

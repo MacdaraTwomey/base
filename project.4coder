@@ -7,13 +7,14 @@ patterns = {
     "*.h",
     "build*",
     "*.4coder",
+    "*.txt",
 };
 //blacklist_patterns = {
 //};
 
 load_paths_base = {
     { .path = ".", .relative = true, .recursive = false, },
-    { .path = "code", .relative = true, .recursive = false, },
+    { .path = "src", .relative = true, .recursive = false, },
 };
 load_paths = {
     .win = load_paths_base,

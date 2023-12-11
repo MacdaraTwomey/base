@@ -25,40 +25,73 @@
 //
 
 #if defined(_WIN32)
-#define BASE_OS_WINDOWS 1
+#  define BASE_OS_WINDOWS 1
 #elif defined(__linux__)
-#define BASE_OS_LINUX 1
+#  define BASE_OS_LINUX 1
 #elif defined(__APPLE__) || defined(__MACH__)
-#define BASE_OS_MAC 1
+#  define BASE_OS_MAC 1
 #elif defined(__unix__)
-#define BASE_OS_UNIX 1               // Some non-linux non-apple unix variety
+#  define BASE_OS_UNIX 1               // Some non-linux non-apple unix variety
 #else
-#error "Could not detect operating system"
+#  error "Could not detect operating system"
+#endif
+
+#if !defined(BASE_OS_WINDOWS)
+#  define BASE_OS_WINDOWS 0
+#endif
+#if !defined(BASE_OS_LINUX)
+#  define BASE_OS_LINUX 0
+#endif
+#if !defined(BASE_OS_MAC)
+#  define BASE_OS_MAC 0
+#endif
+#if !defined(BASE_OS_UNIX)
+#  define BASE_OS_UNIX 0
 #endif
 
 // Check clang first because clang often will define __GNUC__ or _MSC_VER as well
 #if defined(__clang__)
-#define BASE_COMPILER_CLANG 1
+#  define BASE_COMPILER_CLANG 1
 #elif defined(_MSC_VER)
-#define BASE_COMPILER_MSVC 1
+#  define BASE_COMPILER_MSVC 1
 #elif defined(__GNUC__)
-#define BASE_COMPILER_GCC 1
+#  define BASE_COMPILER_GCC 1
 #else
-#error "Could not detect compiler"
+#  error "Could not detect compiler"
+#endif
+
+#if !defined(BASE_COMPILER_CLANG)
+#  define BASE_COMPILER_CLANG 0
+#endif
+#if !defined(BASE_COMPILER_MSVC)
+#  define BASE_COMPILER_MSVC 0
+#endif
+#if !defined(BASE_COMPILER_GCC)
+#  define BASE_COMPILER_GCC 0
 #endif
 
 #if defined(_M_IX86) || defined(__i386__) 
-#define BASE_ARCH_X86 1              // 32-bit x86 architecture
+#  define BASE_ARCH_X86 1              // 32-bit x86 architecture
 #elif defined(_M_X64) || defined(__x86_64__) 
-#define BASE_ARCH_X64 1              // 64-bit x86 architecture
+#  define BASE_ARCH_X64 1              // 64-bit x86 architecture
 #elif defined(__arm__) 
-#define BASE_ARCH_ARM 1              
+#  define BASE_ARCH_ARM 1              
 #else
-#error "Could not detect CPU architecture"
+#  error "Could not detect CPU architecture"
+#endif
+
+#if !defined(BASE_ARCH_X86)
+#  define BASE_ARCH_X86 0
+#endif
+#if !defined(BASE_ARCH_X64)
+#  define BASE_ARCH_X64 0
+#endif
+#if !defined(BASE_ARCH_ARM)
+#  define BASE_ARCH_ARM 0
 #endif
 
 #if !BASE_OS_WINDOWS && !BASE_OS_LINUX
-#error "This operating system is currently not supported"
+#  error "This operating system is currently not supported"
 #endif
 
 ///////////////////////////////////////////////////////////////////////
@@ -67,25 +100,27 @@
 
 #if !defined(BASE_DEBUG_TRAP)
 
-#if defined(BASE_OS_WINDOWS)
-// On windows use __debugbreak
+#  if BASE_OS_WINDOWS
+//// On windows use __debugbreak
 extern void __cdecl __debugbreak(void); // To avoid including intrin.h
-#define BASE_DEBUG_TRAP() __debugbreak() 
-#else
-
-#if defined(BASE_OS_MAC)
-#error "Not implemented"
-#elif defined(BASE_ARCH_ARM)
-#error "Not implemented"
-#elif defined(BASE_ARCH_X64) || defined(BASE_ARCH_X86)
-#define BASE_DEBUG_TRAP() __builtin_trap()
-#else
-#define BASE_DEBUG_TRAP() (*(int *)0 = 0;)
+#    define BASE_DEBUG_TRAP() __debugbreak() 
+#  elif BASE_OS_MAC
+#    error "Not implemented"
+#  elif BASE_ARCH_ARM
+#    error "Not implemented"
+#  elif BASE_ARCH_X64 || BASE_ARCH_X86
+#    define BASE_DEBUG_TRAP() __builtin_trap()
+#  else
+#    define BASE_DEBUG_TRAP() (*(int *)0 = 0;)
+#  endif
 #endif
 
-#endif // defined(BASE_OS_WINDOWS)
-#endif // !defined(BASE_DEBUG_TRAP)
-
+#if BASE_COMPILER_CLANG || BASE_COMPILER_GCC
+// 1 based indexing for parameter
+#  define BASE_FORMAT_STRING_CHECK(StringIndex, ArgsIndex)  __attribute__((__format__ (__printf__, StringIndex, ArgsIndex)))
+#else
+#  define BASE_FORMAT_STRING_CHECK(StringIndex, ArgsIndex) 
+#endif
 
 #define BASE_STRINGIFY_(Str) #Str
 #define BASE_STRINGIFY(Str) BASE_STRINGIFY_(Str)
@@ -96,18 +131,19 @@ extern void __cdecl __debugbreak(void); // To avoid including intrin.h
 // If BASE_DEBUG is not defined then we enable it, 
 // If BASE_DEBUG is defined but with no value then we still get assertions, 
 // if BASE_DEBUG is zero then we don't have assertions (unless they are specifically turned on), 
-// if BASE_DEBUG is one then we have assertions (unless they are specifically turned off).
+// if BASE_DEBUG is on then we have assertions (unless they are specifically turned off).
 #if !defined(BASE_DEBUG)
-#define BASE_DEBUG 1
+#  define BASE_DEBUG 1
 #endif
 
 void BaseAssertPrint_(const char *Format, ...);
 
 #if (defined(BASE_ENABLE_ASSERT) && (BASE_ENABLE_ASSERT == 0)) || (!defined(BASE_ENABLE_ASSERT) && BASE_DEBUG == 0)
-#define Assert(Cond) ((void)0)
+#  define Assert(Cond) ((void)0)
 #else
 // In this instance we don't want to macro expand Cond, so that we can print our macros without substitution.
-#define Assert(Cond) do { \
+#  define Assert(Cond) \
+do { \
 if (!static_cast<bool>((Cond))) { \
 BaseAssertPrint_("%s:%s():%i: Assertion: `%s' failed.\n", __FILE__, __func__, __LINE__, #Cond); \
 BASE_DEBUG_TRAP(); \
@@ -200,7 +236,7 @@ struct temp_arena
 {
     arena *Arena;
     u64 StartPos;
-    u32 StartTempCount;
+    u32 TempIndex;
 };
 
 enum arena_push_flags : u32
@@ -292,8 +328,9 @@ string CreateString(u8 *StringData, u64 Length);
 string PushString(arena *Arena, string String);
 u8 *   PushCString(arena *Arena, u8 *String);
 u8 *   PushCString(arena *Arena, string String);
-string PushStringfArgs(arena *Arena, char *Format, va_list Args);
-string PushStringf(arena *Arena, char *Format, ...);
+string PushStringfArgs(arena *Arena, char *Format, va_list Args);\
+
+string PushStringf(arena *Arena, char *Format, ...) BASE_FORMAT_STRING_CHECK(2, 3);
 
 u64    StringLength(u8 *CString);
 u8     StringGetChar(string String, u64 Index);

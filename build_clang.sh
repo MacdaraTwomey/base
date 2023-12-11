@@ -46,7 +46,7 @@ if [[ $OS == "win" ]]
 then
     CC="clang++.exe"
 
-    SOURCE="$ROOT/code/win32.cpp"
+    SOURCE="$ROOT/src/win32.cpp"
 	LIBS="-lopengl32.lib -lkernel32.lib -l user32.lib -lgdi32.lib"
 
 	# -m uses '/' instead of '\'
@@ -55,7 +55,7 @@ then
 elif [[ $OS == "linux" ]]
 then
     CC="clang++"
-    SOURCE="$ROOT/code/linux.cpp"
+    SOURCE="$ROOT/src/linux.cpp"
 else
     echo "Error: Invalid OS '$OS'"
     exit 1
@@ -64,7 +64,7 @@ fi
 pushd build > /dev/null
 
 # -fdiagnostics-color forces colour even when piping to sed
-CMD="$CC -o base_test.exe -g -Wall -pedantic-errors -std=c++17 $DISABLED_WARNINGS $SOURCE $FLAGS -I $INCLUDE $LIBS"
+CMD="$CC -o test.exe -g -Wall -pedantic-errors -std=c++17 $DISABLED_WARNINGS $SOURCE $FLAGS -I $INCLUDE $LIBS"
 echo $CMD
 
 if [[ $LINUX_OUTPUT_PATH_TYPE == "win-path" ]]

@@ -1,0 +1,9 @@
+
+TODO: 
+* Better platform file handling (handle api, error accumulation)
+* Multiple scratch arenas in thread local, w/ conflicts
+* date and time 
+* Don't assume page size
+* Better format string substitutions
+* Combine string function StringConcat(arena *Arena, ...) ?
+* More tests for arenas, nested and conflicting scratches
