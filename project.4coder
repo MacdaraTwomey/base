@@ -36,7 +36,7 @@ commands = {
         .win = "bash build_msvc.sh"},
     
     .run = { .out = "*run*", .footer_panel = true, .save_dirty_files = false,
-        .win = "build\base_test.exe"},
+        .win = "bash -c build/test.exe"},
     
     .buildrun = { .out = "*compilation*", .footer_panel = true, .save_dirty_files = true,
         .win = "bash build_and_run.sh"},

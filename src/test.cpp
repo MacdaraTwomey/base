@@ -115,7 +115,42 @@ void NestedScratchReuseAlternating(u32 Depth, arena *Arena)
     }
     
     ReleaseScratch(Scratch);
-    return;
+}
+
+void NestedScratchReuseAlternatingWithExtra(u32 Depth, arena *Arena1, arena *Arena2)
+{
+    if (Depth == 8)
+    {
+        return;
+    }
+    
+    bool ReleaseArena2 = false;
+    if (Arena2 == 0)
+    {
+        Arena2 = CreateArena(GB(1));
+        ReleaseArena2 = true;
+    }
+    
+    temp_arena Scratch = GetScratch(Arena1, Arena2);
+    u32 *Value = PushArray(Scratch.Arena, 10, u32);
+    for (u32 i = 0; i < 10; ++i) 
+    {
+        Value[i] = i + (Depth * 10);
+    }
+    
+    NestedScratchReuseAlternatingWithExtra(Depth + 1, Scratch.Arena, Arena2);
+    
+    for (u32 i = 0; i < 10; ++i) 
+    {
+        Assert(Value[i] == i + (Depth * 10));
+    }
+    
+    ReleaseScratch(Scratch);
+    
+    if (ReleaseArena2)
+    {
+        FreeArena(Arena2);
+    }
 }
 
 
@@ -149,7 +184,6 @@ void RunTests()
     }
 #endif
     
-#if 0
     struct test
     {
         u32 A;
@@ -158,7 +192,9 @@ void RunTests()
         u64 D;
     };
     
+#if 0
     {
+        // Test crashes after using past end of allocation
         arena *Arena = CreateArena(GB(1));
         test *Test = PushArray(Arena, 2, test);
         Test->A = 0;
@@ -331,10 +367,35 @@ void RunTests()
     }
     
     {
+        // Test zero size allocations
+        temp_arena Scratch = GetScratch();
+        u32 *ZeroArray = PushArray(Scratch.Arena, 0, u32);
+        MemoryCopy(0, (char *)"", ZeroArray);
+        PushString(Scratch.Arena, StrLit(""));
+        ReleaseScratch(Scratch);
+    }
+    
+    {
         NestedScratchReuseSame(0);
         NestedScratchReuseAlternating(0, 0);
+        NestedScratchReuseAlternatingWithExtra(0, 0, 0);
+    }
+    
+    {
+        // Address sanitizer
         
-        // TODO: Test with conflicts
+        char *Base = (char *)PlatformMemoryReserve(4096);
+        PlatformMemoryCommit(Base, 4096);
+        ASAN_POISON_MEMORY_REGION(Base + 3, 4096 - 3);
+        Base[0] = 'x';
+        Base[1] = 'x';
+        Base[2] = 'x';
+        Base[3] = 'x';
+        Base[4] = 'x';
+        Base[5] = 'x';
+        Base[6] = 'x';
+        Base[7] = 'x';
+        Base[8] = 'x';
     }
     
     {
@@ -555,25 +616,28 @@ void RunTests()
         string File = PlatformReadEntireFile(Arena, File1Path);
         Assert(File.Length == 94);
         Assert(File.Str);
+        
 #if 0
-        u64 TotalSize = GB(5);
-        u64 ChunkSize = TotalSize / 32;
-        Assert(TotalSize % 32 == 0);
-        u32 WriteCount = 32;
-        u8 *Chunk = PushArray(Arena, ChunkSize, u8);
-        
-        FILE *fp = fopen("large.big", "wb");
-        for (u32 i = 0; i < WriteCount; ++i)
         {
-            fwrite(Chunk, ChunkSize, 1, fp);
+            u64 TotalSize = GB(5);
+            u64 ChunkSize = TotalSize / 32;
+            Assert(TotalSize % 32 == 0);
+            u32 WriteCount = 32;
+            u8 *Chunk = PushArray(Arena, ChunkSize, u8);
+            
+            FILE *fp = fopen("large.big", "wb");
+            for (u32 i = 0; i < WriteCount; ++i)
+            {
+                fwrite(Chunk, ChunkSize, 1, fp);
+            }
+            fclose(fp);
+            
+            PopSize(Arena, ChunkSize);
+            
+            platform_file_contents LargeFile = PlatformReadEntireFile(Arena, StrLit("large.big"));
+            
+            DeleteFile("large.big");
         }
-        fclose(fp);
-        
-        PopSize(Arena, ChunkSize);
-        
-        platform_file_contents LargeFile = PlatformReadEntireFile(Arena, StrLit("large.big"));
-        
-        DeleteFile("large.big");
 #endif
         
         u64 Data[] = { 0x3234234, 0x23423423, 0x0349538450, 0x93213, 0x34882349 };
@@ -624,4 +688,6 @@ void RunTests()
     }
     
     FreeArena(TestDataArena);
+    
+    printf("All tests passed\n");
 }

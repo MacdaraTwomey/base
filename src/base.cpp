@@ -89,6 +89,8 @@ arena *CreateArena(u64 ReserveSize)
             Arena->Commit = CommitSize;
             Arena->Reserve = AlignedReserveSize;
             Arena->TempCount = 0;
+            
+            ASAN_POISON_MEMORY_REGION(Arena + 1, CommitSize - sizeof(arena));
         }
         else
         {
@@ -169,11 +171,13 @@ void *PushSize_(arena *Arena, u64 Size, u32 Alignment, u32 ArenaPushFlags)
             
             Result += AlignedOffset;
 #endif
+            ASAN_UNPOISON_MEMORY_REGION(Result, Size);
             
             if (ArenaPushFlags & ArenaPushFlags_ClearToZero)
             {
                 MemoryZero(Size, Result);
             }
+            
         }
     }
     
@@ -223,6 +227,8 @@ void PopToPosition(arena *Arena, u64 Position)
         PlatformMemoryRemoveGuard(Arena->Base + RemoveGuardStart, RemoveGuardSize);
     }
 #endif
+    
+    ASAN_POISON_MEMORY_REGION(Arena->Base + NewPos, Arena->Pos - NewPos);
     
     Arena->Pos = NewPos;
 }

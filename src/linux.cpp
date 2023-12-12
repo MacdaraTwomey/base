@@ -168,7 +168,9 @@ bool PlatformMemoryCommit(void *Address, u64 Size)
     Assert(Address);
     Assert(Size > 0);
     PlatformMemoryRemoveGuard(Address, Size);
-    MemoryZero(Size, Address);
+    // Ideally we would zero the memory here to make similar to windows, but this doesn't work when using 
+    // AddressSanitizer as we haven't unpoisoned our memory yet. But if we are using address sanitizer we
+    // don't have much to worry about.
     return true; 
 }
 

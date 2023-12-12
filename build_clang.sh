@@ -29,7 +29,7 @@ fi
 
 
 ROOT=$PWD
-FLAGS="-DBASE_DEBUG=1"
+FLAGS="-DBASE_DEBUG=1 -DARENA_GUARD_PAGES=0 -fsanitize=address"
 INCLUDE="$ROOT/deps"
 DISABLED_WARNINGS=" \
 -Wno-unused-variable \

@@ -1,5 +1,6 @@
 
 TODO: 
+* BUG: Asan requires 8 byte aligned addresses to be poisoned. Else you can get false positives and false negatives.
 * Better platform file handling (handle api, error accumulation)
 * Multiple scratch arenas in thread local, w/ conflicts
 * date and time 
