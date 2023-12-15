@@ -13,12 +13,15 @@
 // TODO: Make thread local
 static arena *GlobalScratchArenaPool[2] = {};
 
+// TODO: Query page size
 #define ARENA_HEADER_SIZE 64
 #define PAGE_SIZE 4096
 #define COMMIT_CHUNK_SIZE MB(32)
 
 static_assert(sizeof(arena) <= ARENA_HEADER_SIZE, "Must be able to fit arena struct into start of arena memory");
 
+// We could make things like MemoryCopy do nothing if length is zero.
+// It removes some annoying checks from calling code.
 void MemoryCopy(u64 Size, void *Source, void *Dest)
 {
     Assert(Source != nullptr && Dest != nullptr);
@@ -108,9 +111,16 @@ void FreeArena(arena *Arena)
     PlatformMemoryFree(Arena->Base, Arena->Reserve);
 }
 
-// If Size is 0, we return a correctly aligned pointer.
+// Now that this function can return NULL, it means you always need to check the pointer before copying
+// into it, even if your size to copy is zero.
+// We could return a pointer to a poisoned or guard page region of memory instead.
+// Or we could make things like MemoryCopy do nothing if length is zero.
 void *PushSize_(arena *Arena, u64 Size, u32 Alignment, u32 ArenaPushFlags)
 {
+    if (Size == 0)
+    {
+        return 0;
+    }
     
     // It is not really necessary to properly align allocations on modern x64 processors (unless you are doing SIMD, or possibly on ARM), 
     // It may be undefined behaviour to access an unaligned type, but we are already ignoring strict aliasing.
@@ -123,18 +133,19 @@ void *PushSize_(arena *Arena, u64 Size, u32 Alignment, u32 ArenaPushFlags)
     Assert(Arena->Commit <= Arena->Reserve);
     Assert((Arena->Commit & (PAGE_SIZE - 1)) == 0);
     
-    u8 *Result = nullptr;
+    u64 Apron = 0;
+#if ASAN_ENABLED
+    Alignment = Maximum(8, Alignment);
+    // Size of poisoned memory before and after allocation
+    Apron = ClampTop(Size * 4, 1024);
+#endif
     
-    u64 AllocStart = AlignUp(Arena->Pos, Alignment);
-    u64 AllocEnd   = AllocStart + Size;
+    u8 *Result = 0;
+    
+    u64 AllocStart = AlignUp(Arena->Pos + Apron, Alignment);
+    u64 AllocEnd   = AllocStart + Size + Apron;
     
     u64 NewPos = AllocEnd;
-    
-#if ARENA_GUARD_PAGES
-    u64 GuardStart = AlignUp(AllocEnd, PAGE_SIZE); 
-    u64 GuardEnd   = GuardStart + PAGE_SIZE; 
-    NewPos = GuardEnd;
-#endif
     
     if (NewPos < Arena->Reserve)
     {
@@ -146,6 +157,8 @@ void *PushSize_(arena *Arena, u64 Size, u32 Alignment, u32 ArenaPushFlags)
             if (PlatformMemoryCommit(Arena->Base + Arena->Commit, NewCommitSize))
             {
                 Arena->Commit = NewCommit;
+                static_assert(COMMIT_CHUNK_SIZE % 8 == 0, "Commit chunks must be 8 byte aligned for ASan");
+                ASAN_POISON_MEMORY_REGION(Arena->Base + Arena->Commit, NewCommitSize);
             }
         }
         
@@ -154,34 +167,14 @@ void *PushSize_(arena *Arena, u64 Size, u32 Alignment, u32 ArenaPushFlags)
             Result = Arena->Base + AllocStart;
             Arena->Pos = NewPos;
             
-#if ARENA_GUARD_PAGES
-            PlatformMemoryGuard(Arena->Base + GuardStart, PAGE_SIZE);
-            
-            // The only cases where AllofStart + BytesToPageBoundary  is not aligned to the requested alignment
-            // is when the passed size is not a multiple of the alignment. This should only occur where
-            // PushSize_ is called directly, as structs and arrays of structs will have a size that is a multiple
-            // of their alignment.
-            u64 BytesToPageBoundary = AlignUp(AllocEnd, PAGE_SIZE) - AllocEnd;
-            u64 AlignedOffset = AlignDown(BytesToPageBoundary, Alignment);
-            
-            u64 AllocStartGuardPageAdjacent = AlignDown(AllocStart + BytesToPageBoundary, Alignment);
-            // AllocStart = AllocStartGuardPageAdjacent;
-            // Checking if math is the same with new way to do it
-            Assert(AllocStartGuardPageAdjacent == AllocStart + AlignedOffset);
-            
-            Result += AlignedOffset;
-#endif
             ASAN_UNPOISON_MEMORY_REGION(Result, Size);
             
             if (ArenaPushFlags & ArenaPushFlags_ClearToZero)
             {
                 MemoryZero(Size, Result);
             }
-            
         }
     }
-    
-    Assert(Result);
     
     return Result;
 }
@@ -189,7 +182,10 @@ void *PushSize_(arena *Arena, u64 Size, u32 Alignment, u32 ArenaPushFlags)
 void *PushCopy_(arena *Arena, u64 Size, void *Source, u32 Alignment)
 {
     void *Memory = PushSize_(Arena, Size, Alignment, ArenaPushFlags_None);
-    MemoryCopy(Size, Source, Memory);
+    if (Memory)
+    {
+        MemoryCopy(Size, Source, Memory);
+    }
     return Memory;
 }
 
@@ -217,16 +213,6 @@ void PopToPosition(arena *Arena, u64 Position)
     }
     
     Assert(ClampTop(Arena->Pos, Arena->Commit) >= NewPos);
-    
-#if ARENA_GUARD_PAGES
-    u64 RemoveGuardStart = AlignDown(NewPos, PAGE_SIZE); 
-    u64 RemoveGuardEnd   = AlignUp(ClampTop(Arena->Pos, Arena->Commit), PAGE_SIZE); 
-    u64 RemoveGuardSize  = RemoveGuardEnd - RemoveGuardStart;
-    if (RemoveGuardSize > 0)
-    {
-        PlatformMemoryRemoveGuard(Arena->Base + RemoveGuardStart, RemoveGuardSize);
-    }
-#endif
     
     ASAN_POISON_MEMORY_REGION(Arena->Base + NewPos, Arena->Pos - NewPos);
     
@@ -808,8 +794,11 @@ string StringListJoin(arena *Arena, string_list *List)
     u64 CopiedLength = 0;
     for (string_node *Node = List->Head; Node; Node = Node->Next)
     {
-        MemoryCopy(Node->String.Length, Node->String.Str, StringMemory + CopiedLength);
-        CopiedLength += Node->String.Length;
+        if (Node->String.Length > 0)
+        {
+            MemoryCopy(Node->String.Length, Node->String.Str, StringMemory + CopiedLength);
+            CopiedLength += Node->String.Length;
+        }
     }
     
     string Result = {};

@@ -29,7 +29,7 @@ fi
 
 
 ROOT=$PWD
-FLAGS="-DBASE_DEBUG=1 -DARENA_GUARD_PAGES=0 -fsanitize=address"
+FLAGS="-DBASE_DEBUG=1 -DARENA_GUARD_PAGES=0 -fsanitize=address -std=c++17"
 INCLUDE="$ROOT/deps"
 DISABLED_WARNINGS=" \
 -Wno-unused-variable \
@@ -64,7 +64,7 @@ fi
 pushd build > /dev/null
 
 # -fdiagnostics-color forces colour even when piping to sed
-CMD="$CC -o test.exe -g -Wall -pedantic-errors -std=c++17 $DISABLED_WARNINGS $SOURCE $FLAGS -I $INCLUDE $LIBS"
+CMD="$CC -o test.exe -g -Wall -pedantic-errors $DISABLED_WARNINGS $SOURCE $FLAGS -I $INCLUDE $LIBS"
 echo $CMD
 
 if [[ $LINUX_OUTPUT_PATH_TYPE == "win-path" ]]

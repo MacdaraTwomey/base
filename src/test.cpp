@@ -370,8 +370,9 @@ void RunTests()
         // Test zero size allocations
         temp_arena Scratch = GetScratch();
         u32 *ZeroArray = PushArray(Scratch.Arena, 0, u32);
-        MemoryCopy(0, (char *)"", ZeroArray);
-        PushString(Scratch.Arena, StrLit(""));
+        Assert(ZeroArray == 0);
+        string S = PushString(Scratch.Arena, StrLit(""));
+        Assert(S.Length == 0);
         ReleaseScratch(Scratch);
     }
     
@@ -379,23 +380,6 @@ void RunTests()
         NestedScratchReuseSame(0);
         NestedScratchReuseAlternating(0, 0);
         NestedScratchReuseAlternatingWithExtra(0, 0, 0);
-    }
-    
-    {
-        // Address sanitizer
-        
-        char *Base = (char *)PlatformMemoryReserve(4096);
-        PlatformMemoryCommit(Base, 4096);
-        ASAN_POISON_MEMORY_REGION(Base + 3, 4096 - 3);
-        Base[0] = 'x';
-        Base[1] = 'x';
-        Base[2] = 'x';
-        Base[3] = 'x';
-        Base[4] = 'x';
-        Base[5] = 'x';
-        Base[6] = 'x';
-        Base[7] = 'x';
-        Base[8] = 'x';
     }
     
     {

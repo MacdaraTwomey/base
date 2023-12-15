@@ -220,7 +220,13 @@ static_assert(sizeof(u64) == sizeof(s64), "");
 //
 
 // From sanitizer/asan_interface.h
-#if __has_feature(address_sanitizer) || defined(__SANITIZE_ADDRESS__)
+#if (__has_feature(address_sanitizer) || defined(__SANITIZE_ADDRESS__))
+#  define ASAN_ENABLED 1
+#else
+#  define ASAN_ENABLED 0
+#endif
+
+#if ASAN_ENABLED
 extern "C" {
     void __asan_poison_memory_region(void const volatile *addr, size_t size);
     void __asan_unpoison_memory_region(void const volatile *addr, size_t size);
