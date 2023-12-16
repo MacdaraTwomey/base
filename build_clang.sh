@@ -29,8 +29,9 @@ fi
 
 
 ROOT=$PWD
-FLAGS="-DBASE_DEBUG=1 -DARENA_GUARD_PAGES=0 -fsanitize=address -std=c++17"
-INCLUDE="$ROOT/deps"
+SOURCE="$ROOT/src/app.cpp"
+FLAGS="-DBASE_DEBUG=1 -O2 -std=c++20"
+INCLUDE="-I $ROOT/deps"
 DISABLED_WARNINGS=" \
 -Wno-unused-variable \
 -Wno-gnu-anonymous-struct \
@@ -46,7 +47,6 @@ if [[ $OS == "win" ]]
 then
     CC="clang++.exe"
 
-    SOURCE="$ROOT/src/win32.cpp"
 	LIBS="-lopengl32.lib -lkernel32.lib -l user32.lib -lgdi32.lib"
 
 	# -m uses '/' instead of '\'
@@ -55,7 +55,6 @@ then
 elif [[ $OS == "linux" ]]
 then
     CC="clang++"
-    SOURCE="$ROOT/src/linux.cpp"
 else
     echo "Error: Invalid OS '$OS'"
     exit 1
@@ -64,7 +63,7 @@ fi
 pushd build > /dev/null
 
 # -fdiagnostics-color forces colour even when piping to sed
-CMD="$CC -o test.exe -g -Wall -pedantic-errors $DISABLED_WARNINGS $SOURCE $FLAGS -I $INCLUDE $LIBS"
+CMD="$CC -o test.exe -g -Wall -pedantic-errors $DISABLED_WARNINGS $SOURCE $FLAGS $INCLUDE $LIBS"
 echo $CMD
 
 if [[ $LINUX_OUTPUT_PATH_TYPE == "win-path" ]]

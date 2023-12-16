@@ -1,4 +1,5 @@
 
+#include "platform.h"
 #include "base.h"
 
 #define _USE_MATH_DEFINES
@@ -152,7 +153,6 @@ void NestedScratchReuseAlternatingWithExtra(u32 Depth, arena *Arena1, arena *Are
         FreeArena(Arena2);
     }
 }
-
 
 void RunTests()
 {
@@ -380,6 +380,23 @@ void RunTests()
         NestedScratchReuseSame(0);
         NestedScratchReuseAlternating(0, 0);
         NestedScratchReuseAlternatingWithExtra(0, 0, 0);
+    }
+    
+    {
+        temp_arena Scratch = GetScratch();
+        string String1 = StringConcat(Scratch.Arena, StrLit("ABC"), StrLit("DEF"), StrLit(""), StrLit("GH"));
+        Assert(StringsAreEqual(String1, StrLit("ABCDEFGH")));
+        
+        string String2 = StringConcat(Scratch.Arena, StrLit("ABC"));
+        Assert(StringsAreEqual(String2, StrLit("ABC")));
+        
+        string String3 = StringConcat(Scratch.Arena, StrLit(""));
+        Assert(StringsAreEqual(String3, StrLit("")));
+        
+        string String4 = StringConcat(Scratch.Arena);
+        Assert(StringsAreEqual(String4, StrLit("")));
+        
+        ReleaseScratch(Scratch);
     }
     
     {
@@ -632,7 +649,7 @@ void RunTests()
         
         string RoundTripFile = PlatformReadEntireFile(Arena, WriteFilePath);
         Assert(RoundTripFile.Length == sizeof(Data));
-        Assert(memcmp(Data, RoundTripFile.Str, sizeof(Data)) == 0);
+        Assert(MemoryIsEqual(sizeof(Data), Data, RoundTripFile.Str));
         
         Assert(PlatformDeleteFile(WriteFilePath));
         
@@ -675,3 +692,4 @@ void RunTests()
     
     printf("All tests passed\n");
 }
+

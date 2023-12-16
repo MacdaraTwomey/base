@@ -11,7 +11,6 @@
 
 // Flags:
 // BASE_DEBUG         Enables asserts. Enabled by default.
-// ARENA_GUARD_PAGES  Enables buffer overflow checking for arena allocations. Enabled if BASE_DEBUG is on.
 
 // NOTE: Things to consider
 // - Currently the math functions are in the header forcing us to include math.h here. They need to be in the 
@@ -238,10 +237,6 @@ extern "C" {
 #  define ASAN_UNPOISON_MEMORY_REGION(addr, size) ((void)(addr), (void)(size))
 #endif 
 
-#if !defined(ARENA_GUARD_PAGES) && (BASE_DEBUG == 1)
-#  define ARENA_GUARD_PAGES 1
-#endif
-
 struct arena
 {
     u8 *Base;
@@ -339,7 +334,9 @@ struct string_list
     u64 Length;
 };
 
-#define StrLit(lit) string{(u8 *)(lit), sizeof(lit) - 1} // Null terminator not included in Length
+// We could make a StrLitStruct that does a case of memory to u8 * and uses sizeof struct
+// this lets you use StringListJoin on structs.
+#define StrLit(lit) string{(u8 *)(lit), sizeof(lit) - 1} 
 
 string CreateString(u8 *CString);
 string CreateString(u8 *StringData, u64 Length);
@@ -382,7 +379,7 @@ bool   StringContainsStr(string String, string Substr);
 bool   StringsAreEqual(string A, string B);
 bool   StringsAreEqualCaseInsensitive(string a, string b);
 
-u64    FindLastSlash(string Path);
+u64    StringFindLastSlash(string Path);
 void   RemoveExtension(string *File);
 string FilenameFromPath(string Path);
 string DirectoryFromPath(string Path);
@@ -391,6 +388,8 @@ void StringListAppend(arena *Arena, string_list *List, string String);
 void StringListAppend(arena *Arena, string_list *List, char *String);
 string StringListJoin(arena *Arena, string_list *List);
 string_list StringListSplit(arena *Arena, string String, string Splits);
+template<typename... Ts>
+string StringConcat(arena *Arena, Ts... args);
 
 ///////////////////////////////////////////////////////////////////////
 // Math

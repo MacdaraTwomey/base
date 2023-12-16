@@ -766,7 +766,7 @@ string DirectoryFromPath(string Path)
 void StringListAppend(arena *Arena, string_list *List, string String)
 {
     string_node *Node = PushStruct(Arena, string_node);
-    Node->String = PushString(Arena, String);
+    Node->String = String;
     Node->Next = nullptr;
     
     if (List->Head == nullptr)
@@ -801,12 +801,39 @@ string StringListJoin(arena *Arena, string_list *List)
         }
     }
     
-    string Result = {};
-    Result.Str = StringMemory;
-    Result.Length = CopiedLength;
-    return Result;
+    return {
+        .Str = StringMemory,
+        .Length = CopiedLength,
+    };
 }
 
+template<typename... Ts>
+string StringConcat(arena *Arena, Ts... args)
+{
+    string Strings[] = {string{}, args...};
+    
+    u64 Length = 0;
+    for (u64 i = 1; i < ArrayCount(Strings); ++i)
+    {
+        Length += Strings[i].Length;
+    }
+    
+    u64 CopiedLength = 0;
+    u8 *StringMemory = PushArrayNoZero(Arena, Length, u8);
+    for (u64 i = 1; i < ArrayCount(Strings); ++i)
+    {
+        if (Length > 0)
+        {
+            MemoryCopy(Strings[i].Length, Strings[i].Str, StringMemory + CopiedLength);
+            CopiedLength += Strings[i].Length;
+        }
+    }
+    
+    return {
+        .Str = StringMemory,
+        .Length = CopiedLength,
+    };
+}
 
 string_list StringListSplit(arena *Arena, string String, string Splits)
 {

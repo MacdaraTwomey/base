@@ -71,7 +71,7 @@ string PlatformReadEntireFile(arena *Arena, string FilePath)
 {
     string Contents = {};
     
-    temp_arena Scratch = GetScratch();
+    temp_arena Scratch = GetScratch(Arena);
     
     u8 *PathZ  = PushCString(Scratch.Arena, FilePath);
     int FileHandle = open((char *)PathZ, O_RDONLY);
@@ -213,9 +213,7 @@ void PlatformMemoryRemoveGuard(void *Address, u64 Size)
     mprotect(Address, Size, PROT_READ|PROT_WRITE);
 }
 
-#include "test.cpp"
-
 int main(int ArgCount, char *Args[]) 
 {
-    RunTests();
+    AppMain(ArgCount, Args);
 }
