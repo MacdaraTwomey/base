@@ -6,3 +6,4 @@ TODO:
 * Don't assume page size
 * Better format string substitutions
 * Combine string function StringConcat(arena *Arena, ...) ?
+* Change string function not starting with the word String (e.g. SubstrRange)

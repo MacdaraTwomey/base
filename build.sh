@@ -35,7 +35,7 @@ function wsl_to_win() {
 
 ROOT=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
-SOURCE="$ROOT/src/app.cpp"
+SRC="$ROOT/src/app.cpp"
 INCLUDE="-I $ROOT/deps"
 TARGET="-o test.exe"
 
@@ -57,16 +57,17 @@ if [[ $OS == "win" ]]
 then
     CC="clang++.exe"
 	LIBS="-l opengl32.lib -l kernel32.lib -l user32.lib -l gdi32.lib"
-	SOURCE=`wsl_to_win "$SOURCE"`
+	SRC=`wsl_to_win "$SRC"`
 	INCLUDE=`wsl_to_win "$INCLUDE"`
 elif [[ $OS == "msvc" ]]
 then
     CC="cl.exe"
 	LIBS="-link opengl32.lib kernel32.lib user32.lib gdi32.lib"
-	SOURCE=`wsl_to_win "$SOURCE"`
+	SRC=`wsl_to_win "$SRC"`
 	INCLUDE=`wsl_to_win "$INCLUDE"`
 
-	FLAGS="-DBASE_DEBUG=1 -W3 -std:c++17 -wd4201 -wd4505 -INCREMENTAL:NO -FC -EHs- -nologo -Zi"
+	FLAGS="-DBASE_DEBUG=1 -W3 -std:c++latest -Zc:strictStrings- -wd4201 -wd4505 -INCREMENTAL:NO -FC -EHs- -nologo -Zi"
+	# This needs to be after LIBS (which has the -link flag) for msvc to work
 	TARGET="-out:test.exe"
 elif [[ $OS == "linux" ]]
 then
@@ -78,7 +79,7 @@ fi
 
 pushd build > /dev/null
 
-CMD="$CC $TARGET $FLAGS $SOURCE $INCLUDE $LIBS"
+CMD="$CC $SRC $INCLUDE $FLAGS $LIBS $TARGET"
 echo "$CMD"
 
 if [[ $LINUX_OUTPUT_PATH_TYPE == "win-path" ]]

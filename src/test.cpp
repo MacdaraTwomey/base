@@ -11,7 +11,7 @@ string UTF8FromUTF16(arena *Arena, wchar_t *String16, u32 String16Length);
 // Returns null-terminated string
 wchar_t *UTF16FromUTF8(arena *Arena, u8 *String8, int String8Length);
 
-#if BASE_OS_WINDOWS
+#if 0
 void PageProtection(char *Buffer, DWORD ProtectionFlags)
 {
     if (ProtectionFlags & PAGE_EXECUTE)            strcat_s(Buffer, 4096, "PAGE_EXECUTE|");
@@ -580,6 +580,58 @@ void RunTests()
         
         FreeArena(Arena);
     }
+    
+    {
+        
+        parsed_num Result = StringParseNum(StrLit("123"));
+        Assert(Result.Value == 123);
+        
+        Result = StringParseNum(StrLit("0"));
+        Assert(Result.Value == 0);
+        
+        Result = StringParseNum(StrLit("000123"));
+        Assert(Result.Value == 123);
+        
+        Result = StringParseNum(StrLit("00000000"));
+        Assert(Result.Value == 0);
+        
+        Result = StringParseNum(StrLit("23482736278238"));
+        Assert(Result.Value == 23482736278238);
+        
+        Result = StringParseNum(StrLit("18446744073709551615"));
+        Assert(Result.Value == 18446744073709551615LLU);
+        
+        Result = StringParseNum(StrLit("018446744073709551615"));
+        Assert(Result.Value == 18446744073709551615LLU);
+        
+        Result = StringParseNum(StrLit("18446744073709551616"));
+        Assert(Result.Error);
+        
+        Result = StringParseNum(StrLit("-1"));
+        Assert(Result.Error);
+        
+        Result = StringParseNum(StrLit(""));
+        Assert(Result.Error);
+        
+        Result = StringParseNum(StrLit("acd"));
+        Assert(Result.Error);
+        
+        Result = StringParseNum(StrLit("12acd"));
+        Assert(Result.Error);
+        
+        Result = StringParseNum(StrLit("acd123"));
+        Assert(Result.Error);
+        
+        Result = StringParseNum(StrLit(" 12"));
+        Assert(Result.Error);
+        
+        Result = StringParseNum(StrLit(" "));
+        Assert(Result.Error);
+        
+        Result = StringParseNum(StrLit("12 "));
+        Assert(Result.Error);
+    }
+    
     
     {
         

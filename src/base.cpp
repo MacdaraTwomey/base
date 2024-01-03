@@ -522,6 +522,38 @@ void StringToUpper(string *String)
     }
 }
 
+parsed_num StringParseNum(string String)
+{
+    parsed_num Result = {
+        .Error = (String.Length == 0)
+    };
+    
+    for (u64 i = 0; i < String.Length; ++i)
+    {
+        u8 c = String.Str[i];
+        if (!IsNumber(c))
+        {
+            return {
+                .Value = 0,
+                .Error = true,
+            };
+        }
+        
+        u64 NewValue = (Result.Value * 10) + (c - '0');
+        if (NewValue < Result.Value)
+        {
+            return {
+                .Value = 0,
+                .Error = true,
+            };
+        }
+        
+        Result.Value = NewValue;
+    }
+    
+    return Result;
+}
+
 string StringPrefix(string String, u64 N)
 {
     String.Length = ClampTop(N, String.Length);

@@ -212,8 +212,3 @@ void PlatformMemoryRemoveGuard(void *Address, u64 Size)
     
     mprotect(Address, Size, PROT_READ|PROT_WRITE);
 }
-
-int main(int ArgCount, char *Args[]) 
-{
-    AppMain(ArgCount, Args);
-}

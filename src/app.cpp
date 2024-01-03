@@ -1,6 +1,4 @@
 
-void AppMain(int ArgCount, char *Args[]);
-
 #include "test.cpp"
 
 #if BASE_OS_WINDOWS
@@ -9,7 +7,7 @@ void AppMain(int ArgCount, char *Args[]);
 #  include "linux.cpp"
 #endif
 
-void AppMain(int ArgCount, char *Args[])
+int main(int ArgCount, char *Args[]) 
 {
     RunTests();
 }

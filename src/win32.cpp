@@ -79,57 +79,17 @@ wchar_t *UTF16FromUTF8(arena *Arena, u8 *String8, int String8Length)
 
 string PlatformGetExecutablePath(arena *Arena)
 {
-    temp_arena Scratch = GetScratch(Arena);
-    
-    string Result = {};
-    
-    DWORD Capacity = 1024;
-    wchar_t *Buffer = PushArray(Scratch.Arena, Capacity, wchar_t);
-    
-    u32 Size = 0;
-    for (int Tries = 0; Tries < 4; ++Tries)
-    {
-        // If succeeds then Size is the length NOT including the null terminator.
-        // If truncates then Size is the truncated length including the null terminator.
-        // If fails then Size is zero.
-        Size = GetModuleFileNameW(NULL, Buffer, Capacity);
-        if (Size == Capacity)
-        {
-            // Truncated (Size == NullTerminatedStringSize)
-            Capacity *= 2;
-            Buffer = PushArray(Scratch.Arena, Capacity, wchar_t);
-        }
-        else if (Size == 0)
-        {
-            // Error 
-            break;
-        }
-        else if (Size < Capacity)
-        {
-            // Success (Size == NonNullTerminatedFileNameLength)
-            Result = UTF8FromUTF16(Arena, Buffer, Size);
-            break;
-        }
-    }
-    
-    ReleaseScratch(Scratch);
-    
-    return Result;
-}
-
-string PlatformGetExecutablePath(arena *Arena)
-{
     string Path = {};
     
     temp_arena Scratch = GetScratch(Arena);
     
-    u64 BufferSize = KB(8);
-    u8 *Buffer = PushArrayNoZero(Scratch.Arena, BufferSize, u8);
+    u32 Capacity = KB(4);
+    wchar_t *Buffer = PushArrayNoZero(Scratch.Arena, Capacity, wchar_t);
     // If succeeds then Size is the length NOT including the null terminator.
     // If truncates then Size is the truncated length including the null terminator.
     // If fails then Size is zero.
-    u32 Size = GetModuleFileNameW(NULL, Buffer, Capacity);
-    if (Size < BufferSize)
+    u32 Size = GetModuleFileNameW(0, (wchar_t *)Buffer, Capacity);
+    if (Size < Capacity)
     {
         Path = UTF8FromUTF16(Arena, Buffer, Size);
     }
@@ -404,10 +364,6 @@ v2s Win32GetWindowDim(HWND Window)
     return Result;
 }
 
-
-int main(int ArgCount, char *Args[]) {
-    AppMain();
-}
 
 #if 0
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine, int nCmdShow)

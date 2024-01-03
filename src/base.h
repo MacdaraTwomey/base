@@ -219,7 +219,8 @@ static_assert(sizeof(u64) == sizeof(s64), "");
 //
 
 // From sanitizer/asan_interface.h
-#if (__has_feature(address_sanitizer) || defined(__SANITIZE_ADDRESS__))
+//#if (__has_feature(address_sanitizer) || defined(__SANITIZE_ADDRESS__))
+#if defined(__SANITIZE_ADDRESS__)
 #  define ASAN_ENABLED 1
 #else
 #  define ASAN_ENABLED 0
@@ -390,6 +391,15 @@ string StringListJoin(arena *Arena, string_list *List);
 string_list StringListSplit(arena *Arena, string String, string Splits);
 template<typename... Ts>
 string StringConcat(arena *Arena, Ts... args);
+
+
+struct parsed_num
+{
+    u64 Value;
+    bool Error;
+};
+
+parsed_num StringParseNum(string String);
 
 ///////////////////////////////////////////////////////////////////////
 // Math

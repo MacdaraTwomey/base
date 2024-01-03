@@ -2,7 +2,7 @@
 
 ROOT=$PWD
 
-$ROOT/build_clang.sh win
+$ROOT/build.sh win
 
 STATUS=$?
 
