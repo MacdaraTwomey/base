@@ -44,8 +44,8 @@ commands = {
 fkey_command = {
     // Alt-m seems to run the F1 command
     .F1 = "build_clang_linux",
-    //.F1 = "build_msvc",
     .F2 = "run",
     .F3 = "buildrun",
     .F4 = "build_clang_win",
+    .F5 = "build_msvc",
 };

@@ -66,7 +66,8 @@ then
 	SRC=`wsl_to_win "$SRC"`
 	INCLUDE=`wsl_to_win "$INCLUDE"`
 
-	FLAGS="-DBASE_DEBUG=1 -W3 -std:c++latest -Zc:strictStrings- -wd4201 -wd4505 -INCREMENTAL:NO -FC -EHs- -nologo -Zi"
+	# wd5105 because the new MSVC preprocessor warns on microsoft header
+	FLAGS="-DBASE_DEBUG=1 -W3 -std:c++latest /Zc:preprocessor -Zc:strictStrings- -wd5105 -wd4201 -wd4505 -INCREMENTAL:NO -FC -EHs- -nologo -Zi"
 	# This needs to be after LIBS (which has the -link flag) for msvc to work
 	TARGET="-out:test.exe"
 elif [[ $OS == "linux" ]]

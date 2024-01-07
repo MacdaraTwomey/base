@@ -127,6 +127,16 @@ extern void __cdecl __debugbreak(void); // To avoid including intrin.h
 #define CONCAT_(x, y) x##y // Can concat literal characters xy if x and y are macro definitions
 #define CONCAT(x, y) CONCAT_(x, y) // So macro expand x and y first
 
+// Handles [0, 100] arguments
+// Relies on GCC extension ##__VA_ARGS (which works in MSVC with the new preprocessor implementation)
+#define _NUM_ARGS(dummy, X100, X99, X98, X97, X96, X95, X94, X93, X92, X91, X90, X89, X88, X87, X86, X85, X84, X83, X82, X81, X80, X79, X78, X77, X76, X75, X74, X73, X72, X71, X70, X69, X68, X67, X66, X65, X64, X63, X62, X61, X60, X59, X58, X57, X56, X55, X54, X53, X52, X51, X50, X49, X48, X47, X46, X45, X44, X43, X42, X41, X40, X39, X38, X37, X36, X35, X34, X33, X32, X31, X30, X29, X28, X27, X26, X25, X24, X23, X22, X21, X20, X19, X18, X17, X16, X15, X14, X13, X12, X11, X10, X9, X8, X7, X6, X5, X4, X3, X2, X1, N, ...) N
+
+#define NUM_ARGS(...) _NUM_ARGS(dummy, ##__VA_ARGS__, 100, 99, 98, 97, 96, 95, 94, 93, 92, 91, 90, 89, 88, 87, 86, 85, 84, 83, 82, 81, 80, 79, 78, 77, 76, 75, 74, 73, 72, 71, 70, 69, 68, 67, 66, 65, 64, 63, 62, 61, 60, 59, 58, 57, 56, 55, 54, 53, 52, 51, 50, 49, 48, 47, 46, 45, 44, 43, 42, 41, 40, 39, 38, 37, 36, 35, 34, 33, 32, 31, 30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+
+static_assert(NUM_ARGS() == 0, "Empty argument must be zero");
+static_assert(NUM_ARGS(A) == 1, "Must be 1");
+static_assert(NUM_ARGS(A, B) == 2, "Must be 2");
+
 // If BASE_DEBUG is not defined then we enable it, 
 // If BASE_DEBUG is defined but with no value then we still get assertions, 
 // if BASE_DEBUG is zero then we don't have assertions (unless they are specifically turned on), 
@@ -282,20 +292,13 @@ void        EndTempArena(temp_arena TempArena);
 void        CheckArena(arena *Arena);
 void        ReleaseScratch(temp_arena ScratchMemory);
 
-// We overload based on number of arguments passed because because C++ doesn't have C's compound initializers.
-// I can't figure out a nice way to do it with __VA_ARGS__, and a don't want to use va_list (which I'm not sure
-// would work nice with zero arguements, because you need a way to pass in argument count).
-temp_arena  GetScratch();
-temp_arena  GetScratch(arena *Arena);
-temp_arena  GetScratch(arena *Arena1, arena *Arena2);
-temp_arena  GetScratchImpl(arena **Conflicts, u32 ConflictCount);
+struct conflicting_arena_array
+{
+    arena *Array[2];
+};
 
-//#define GetScratch(...) GetScratchImpl(std::array<arena *>{__VA_ARGS__}, std::array.<arena *>{__VA_ARGS__}.size)
-
-// ## __VA_ARGS is an extension on gcc and clang, and the MSVC preprocessor will eat trailing commas when 
-// VA_ARGS is empty. But this will generate warnings with pedantic error checking.
-//#define PushArray(Arena, Count, Type, ...) (Type *)PushSize_((Arena), (Count)*sizeof(Type), alignof(Type), ##__VA_ARGS__)
-//#define PushStruct(Arena, Type, ...) (Type *)PushSize_((Arena), sizeof(Type), alignof(Type) ##__VA_ARGS__)
+temp_arena  GetScratchImpl(u32 ConflictCount, conflicting_arena_array Conflicts);
+#define GetScratch(...) GetScratchImpl(NUM_ARGS(__VA_ARGS__), conflicting_arena_array{__VA_ARGS__})
 
 #define PushArray(Arena, Count, Type) (Type *)PushSize_((Arena), (Count)*sizeof(Type), alignof(Type), ArenaPushFlags_ClearToZero)
 #define PushArrayNoZero(Arena, Count, Type) (Type *)PushSize_((Arena), (Count)*sizeof(Type), alignof(Type), ArenaPushFlags_None)

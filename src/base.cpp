@@ -260,9 +260,9 @@ void CheckArena(arena *Arena)
     Assert(Arena->TempCount == 0);
 }
 
-temp_arena GetScratchImpl(arena **Conflicts, u32 ConflictCount)
-//temp_arena GetScratchImpl(std::array<arena *> &Array, u32 Count)
+temp_arena GetScratchImpl(u32 ConflictCount, conflicting_arena_array Conflicts)
 {
+    arena **ConflictArray = Conflicts.Array;
     if (GlobalScratchArenaPool[0] == 0)
     {
         static_assert(ArrayCount(GlobalScratchArenaPool) == 2, "Must be only two scratch arenas");
@@ -275,7 +275,7 @@ temp_arena GetScratchImpl(arena **Conflicts, u32 ConflictCount)
     {
         for (u32 i = 0; i < ConflictCount; ++i) 
         {
-            if (GlobalScratchArenaPool[0] == Conflicts[i]) 
+            if (GlobalScratchArenaPool[0] == ConflictArray[i]) 
             {
                 Arena = 0;
                 break;
@@ -287,7 +287,7 @@ temp_arena GetScratchImpl(arena **Conflicts, u32 ConflictCount)
             Arena = GlobalScratchArenaPool[1];
             for (u32 i = 0; i < ConflictCount; ++i) 
             {
-                if (GlobalScratchArenaPool[1] == Conflicts[i]) 
+                if (GlobalScratchArenaPool[1] == ConflictArray[i]) 
                 {
                     Arena = 0;
                     break;
@@ -300,7 +300,7 @@ temp_arena GetScratchImpl(arena **Conflicts, u32 ConflictCount)
     
     return BeginTempArena(Arena);
 }
-
+#if 0
 temp_arena GetScratch()
 {
     return GetScratchImpl(0, 0);
@@ -316,7 +316,9 @@ temp_arena GetScratch(arena *Arena1, arena *Arena2)
     arena *ArenaArray[2] = {Arena1, Arena2};
     return GetScratchImpl(ArenaArray, 2);
 }
+#else
 
+#endif
 void ReleaseScratch(temp_arena ScratchMemory)
 {
     Assert(ScratchMemory.Arena == GlobalScratchArenaPool[0] || 
@@ -524,28 +526,25 @@ void StringToUpper(string *String)
 
 parsed_num StringParseNum(string String)
 {
-    parsed_num Result = {
-        .Error = (String.Length == 0)
-    };
+    parsed_num Result = {};
+    Result.Error = (String.Length == 0);
     
     for (u64 i = 0; i < String.Length; ++i)
     {
         u8 c = String.Str[i];
         if (!IsNumber(c))
         {
-            return {
-                .Value = 0,
-                .Error = true,
-            };
-        }
+            Result.Value = 0;
+            Result.Error = true;
+            return Result;
+        };
         
         u64 NewValue = (Result.Value * 10) + (c - '0');
         if (NewValue < Result.Value)
         {
-            return {
-                .Value = 0,
-                .Error = true,
-            };
+            Result.Value = 0;
+            Result.Error = true;
+            return Result;
         }
         
         Result.Value = NewValue;
@@ -833,10 +832,7 @@ string StringListJoin(arena *Arena, string_list *List)
         }
     }
     
-    return {
-        .Str = StringMemory,
-        .Length = CopiedLength,
-    };
+    return CreateString(StringMemory, CopiedLength);
 }
 
 template<typename... Ts>
@@ -861,10 +857,8 @@ string StringConcat(arena *Arena, Ts... args)
         }
     }
     
-    return {
-        .Str = StringMemory,
-        .Length = CopiedLength,
-    };
+    
+    return CreateString(StringMemory, CopiedLength);
 }
 
 string_list StringListSplit(arena *Arena, string String, string Splits)
