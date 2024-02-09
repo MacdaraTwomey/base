@@ -254,7 +254,7 @@ struct arena
     u64 Pos;
     u64 Commit;
     u64 Reserve;
-    u32 TempCount;
+    u32 TempCount; // I'm not sure if this is useful
 };
 
 struct temp_arena

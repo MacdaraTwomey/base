@@ -306,6 +306,15 @@ void RunTests()
 #endif
     
     {
+        printf("NUM_ARGS(); = %d\n", NUM_ARGS());
+        printf("NUM_ARGS(A); = %d\n", NUM_ARGS(A));
+        printf("NUM_ARGS(A,B); = %d\n", NUM_ARGS(A,B));
+        printf("NUM_ARGS(A,B,C); = %d\n", NUM_ARGS(A,B,C));
+        printf("NUM_ARGS(A, B, C); = %d\n", NUM_ARGS(A, B, C));
+        printf("NUM_ARGS(A , B , C ); = %d\n", NUM_ARGS(A , B , C ));
+    }
+    
+    {
         arena *Arena = CreateArena(GB(300));
         
         u32 *Array1 = PushArray(Arena, MB(30) / 4, u32);

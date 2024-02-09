@@ -270,35 +270,30 @@ temp_arena GetScratchImpl(u32 ConflictCount, conflicting_arena_array Conflicts)
         GlobalScratchArenaPool[1] = CreateArena(GB(16));
     }
     
-    arena *Arena = GlobalScratchArenaPool[0];
-    if (ConflictCount > 0) 
+    arena *Result = 0;
+    for (u32 i = 0; i < ArrayCount(GlobalScratchArenaPool); ++i)
     {
-        for (u32 i = 0; i < ConflictCount; ++i) 
+        arena *ScratchArena = GlobalScratchArenaPool[i];
+        bool Conflict = false;
+        for (u32 ConflictIndex = 0; ConflictIndex < ConflictCount; ++ConflictIndex)
         {
-            if (GlobalScratchArenaPool[0] == ConflictArray[i]) 
+            if (ScratchArena == Conflicts.Array[ConflictIndex])
             {
-                Arena = 0;
+                Conflict = true;
                 break;
             }
         }
         
-        if (!Arena) 
+        if (!Conflict)
         {
-            Arena = GlobalScratchArenaPool[1];
-            for (u32 i = 0; i < ConflictCount; ++i) 
-            {
-                if (GlobalScratchArenaPool[1] == ConflictArray[i]) 
-                {
-                    Arena = 0;
-                    break;
-                }
-            }
+            Result = ScratchArena;
+            break;
         }
     }
     
-    Assert(Arena && "Unable to get non-conflicting arena");
+    Assert(Result && "Unable to get non-conflicting arena");
     
-    return BeginTempArena(Arena);
+    return BeginTempArena(Result);
 }
 #if 0
 temp_arena GetScratch()

@@ -7,3 +7,10 @@ TODO:
 * Better format string substitutions
 * Combine string function StringConcat(arena *Arena, ...) ?
 * Change string function not starting with the word String (e.g. SubstrRange)
+* read_only specifier 
+	#if COMPILER_CL || (COMPILER_CLANG && OS_WINDOWS)
+	# pragma section(".rdata$", read)
+	# define read_only 		__declspec(allocate(".rdata$"))
+	#elif (COMPILER_CLANG && OS_LINUX)
+	# define read_only 	__attribute__((section(".rodata")))
+* #define StringVarg(Str) (int)Str.Length, Str.Str

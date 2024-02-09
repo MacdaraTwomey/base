@@ -37,7 +37,9 @@ ROOT=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 SRC="$ROOT/src/app.cpp"
 INCLUDE="-I $ROOT/deps"
-TARGET="-o test.exe"
+TARGET="test.exe"
+OUT=""
+LIBDIR=""
 
 FLAGS="-g -DBASE_DEBUG=1 -std=c++20"
 #FLAGS+=" -fsanitize=address"

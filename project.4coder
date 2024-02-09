@@ -12,6 +12,9 @@ patterns = {
 //blacklist_patterns = {
 //};
 
+// To symlink base directory on windows 
+// 1. run cmd.exe as admin
+// 2. mklink /d c:\dev\projects\PROJECT_NAME\base c:\dev\projects\base
 load_paths_base = {
     { .path = ".", .relative = true, .recursive = false, },
     { .path = "src", .relative = true, .recursive = false, },
