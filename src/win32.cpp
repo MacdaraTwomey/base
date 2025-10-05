@@ -13,96 +13,6 @@ static bool GlobalAppRunning = false;
 // TODO:
 // - OS__ERROR_MESSAGE to make message box?
 
-void OS_CloseFile(os_file_handle Handle) 
-{
-    Assert(!"Unimplemented for windows");
-}
-
-HANDLE Win32CreateConsole()
-{
-    AllocConsole();
-    
-    FILE* fp;
-    freopen_s(&fp, "CONOUT$", "w", stdout);
-    freopen_s(&fp, "CONIN", "r", stdin);
-    
-    HANDLE con_out = GetStdHandle(STD_OUTPUT_HANDLE);
-    DWORD out_mode;
-    GetConsoleMode(con_out, &out_mode);
-    
-    return GetStdHandle(STD_INPUT_HANDLE);
-}
-
-s64 Win32GetTime()
-{
-    LARGE_INTEGER Now;
-    QueryPerformanceCounter(&Now);
-    return Now.QuadPart;
-}
-
-s64 Win32GetMicrosecondsElaped(s64 start, s64 end)
-{
-    s64 Microseconds;
-    Microseconds = end - start;
-    Microseconds *= 1000000; // microseconds per second
-    Microseconds /= GlobalPerformanceFrequency.QuadPart; // ticks per second
-    return Microseconds;
-}
-
-// Returns non-null terminated string
-string UTF8FromUTF16(arena *Arena, wchar_t *String16, u32 String16Length)
-{
-    Assert(String16Length > 0);
-    
-    u32 Capacity = (String16Length * 4);
-    u8 *Buffer = PushArray(Arena, Capacity, u8);
-    
-    // Returns 0 on failure
-    int ByteCount = WideCharToMultiByte(CP_UTF8, 0, 
-                                        String16, (int)String16Length, 
-                                        (char *)Buffer, (int)Capacity, 
-                                        NULL, NULL);
-    PopSize(Arena, Capacity - ByteCount);
-    return CreateString(Buffer, (u64)ByteCount);
-}
-
-// Returns null-terminated string
-wchar_t *UTF16FromUTF8(arena *Arena, u8 *String8, int String8Length)
-{
-    Assert(String8Length > 0);
-    
-    int Capacity = (String8Length * 2) + 2;
-    wchar_t *Buffer = PushArray(Arena, Capacity, wchar_t);
-    
-    int CharacterCount = MultiByteToWideChar(CP_UTF8, 0, 
-                                             (char *)String8, String8Length, 
-                                             Buffer, Capacity);
-    Buffer[CharacterCount] = 0;
-    return Buffer;
-}
-
-string OS_GetExecutablePath(arena *Arena)
-{
-    string Path = {};
-    
-    temp_arena Scratch = GetScratch(Arena);
-    
-    u32 Capacity = KB(4);
-    wchar_t *Buffer = PushArrayNoZero(Scratch.Arena, Capacity, wchar_t);
-    // If succeeds then Size is the length NOT including the null terminator.
-    // If truncates then Size is the truncated length including the null terminator.
-    // If fails then Size is zero.
-    u32 Size = GetModuleFileNameW(0, (wchar_t *)Buffer, Capacity);
-    if (Size < Capacity)
-    {
-        Path = UTF8FromUTF16(Arena, Buffer, Size);
-    }
-    
-    ReleaseScratch(Scratch);
-    
-    return Path;
-}
-
 // TODO: Maybe allow this to return true if the file is a directory
 bool OS_FileExists(string FilePath)
 {
@@ -116,6 +26,12 @@ bool OS_FileExists(string FilePath)
     ReleaseScratch(Scratch);
     
     return Exists && !IsDirectory;
+}
+
+os_file_info OS_GetFileInfo(string Path)
+{
+    Assert(!"Unimplemented for windows");
+    return OS_FileInfo_Error;
 }
 
 u64 OS_GetFileSize(string FilePath)
@@ -140,6 +56,57 @@ u64 OS_GetFileSize(string FilePath)
     ReleaseScratch(Scratch);
     
     return Result;
+}
+
+string OS_GetExecutablePath(arena *Arena)
+{
+    string Path = {};
+    
+    temp_arena Scratch = GetScratch(Arena);
+    
+    u32 Capacity = KB(4);
+    wchar_t *Buffer = PushArrayNoZero(Scratch.Arena, Capacity, wchar_t);
+    // If succeeds then Size is the length NOT including the null terminator.
+    // If truncates then Size is the truncated length including the null terminator.
+    // If fails then Size is zero.
+    u32 Size = GetModuleFileNameW(0, (wchar_t *)Buffer, Capacity);
+    if (Size < Capacity)
+    {
+        Path = UTF8FromUTF16(Arena, Buffer, Size);
+    }
+    
+    ReleaseScratch(Scratch);
+    
+    return Path;
+}
+
+string OS_CanonicalAbsolutePath(arena *Arena, string Path)
+{
+    Assert(!"Unimplemented for windows");
+    return string{};
+}
+
+os_directory_iterator OS_DirectoryIterator(string DirectoryPath)
+{
+    Assert(!"Unimplemented for windows");
+    return os_directory_iterator{};
+}
+
+void OS_DirectoryIteratorClose(os_directory_iterator *Iter)
+{
+    Assert(!"Unimplemented for windows");
+}
+
+bool OS_DirectoryIteratorIsOk(os_directory_iterator Iter)
+{
+    Assert(!"Unimplemented for windows");
+    return false;
+}
+
+os_filesystem_entry OS_DirectoryIteratorNext(arena *Arena, os_directory_iterator *Iter)
+{
+    Assert(!"Unimplemented for windows");
+    return os_filesystem_entry{};
 }
 
 string OS_ReadEntireFile(arena *Arena, string FilePath)
@@ -259,6 +226,11 @@ bool OS_DeleteFile(string FilePath)
     return Success;
 }
 
+void OS_CloseFile(os_file_handle Handle) 
+{
+    Assert(!"Unimplemented for windows");
+}
+
 void *OS_MemoryReserve(u64 Size)
 {
     Assert(Size > 0);
@@ -320,6 +292,73 @@ void OS_MemoryRemoveGuard(void *Address, u64 Size)
     DWORD OldProtectFlags;
     BOOL Success = VirtualProtect(Address, Size, PAGE_READWRITE, &OldProtectFlags);
     Assert(Success);
+}
+
+//
+// Non os.h functions
+//
+
+HANDLE Win32CreateConsole()
+{
+    AllocConsole();
+    
+    FILE* fp;
+    freopen_s(&fp, "CONOUT$", "w", stdout);
+    freopen_s(&fp, "CONIN", "r", stdin);
+    
+    HANDLE con_out = GetStdHandle(STD_OUTPUT_HANDLE);
+    DWORD out_mode;
+    GetConsoleMode(con_out, &out_mode);
+    
+    return GetStdHandle(STD_INPUT_HANDLE);
+}
+
+s64 Win32GetTime()
+{
+    LARGE_INTEGER Now;
+    QueryPerformanceCounter(&Now);
+    return Now.QuadPart;
+}
+
+s64 Win32GetMicrosecondsElaped(s64 start, s64 end)
+{
+    s64 Microseconds;
+    Microseconds = end - start;
+    Microseconds *= 1000000; // microseconds per second
+    Microseconds /= GlobalPerformanceFrequency.QuadPart; // ticks per second
+    return Microseconds;
+}
+
+// Returns non-null terminated string
+string UTF8FromUTF16(arena *Arena, wchar_t *String16, u32 String16Length)
+{
+    Assert(String16Length > 0);
+    
+    u32 Capacity = (String16Length * 4);
+    u8 *Buffer = PushArray(Arena, Capacity, u8);
+    
+    // Returns 0 on failure
+    int ByteCount = WideCharToMultiByte(CP_UTF8, 0, 
+                                        String16, (int)String16Length, 
+                                        (char *)Buffer, (int)Capacity, 
+                                        NULL, NULL);
+    PopSize(Arena, Capacity - ByteCount);
+    return CreateString(Buffer, (u64)ByteCount);
+}
+
+// Returns null-terminated string
+wchar_t *UTF16FromUTF8(arena *Arena, u8 *String8, int String8Length)
+{
+    Assert(String8Length > 0);
+    
+    int Capacity = (String8Length * 2) + 2;
+    wchar_t *Buffer = PushArray(Arena, Capacity, wchar_t);
+    
+    int CharacterCount = MultiByteToWideChar(CP_UTF8, 0, 
+                                             (char *)String8, String8Length, 
+                                             Buffer, Capacity);
+    Buffer[CharacterCount] = 0;
+    return Buffer;
 }
 
 LRESULT CALLBACK Win32WindowProc(HWND Window, UINT Message, WPARAM wParam, LPARAM lParam)
@@ -442,3 +481,4 @@ u64 OS_GetWallClockMicroseconds() {
     Assert(!"Unimplemented for windows");
     return 0;
 }
+

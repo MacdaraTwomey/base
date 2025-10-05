@@ -160,7 +160,6 @@ BASE_DEBUG_TRAP(); \
 
 #endif
 
-
 ///////////////////////////////////////////////////////////////////////
 // Helpers
 //
@@ -190,6 +189,12 @@ constexpr size_t ArrayCount(T(&)[n])
 }
 
 #define SLL_APPEND(Head, Tail, Node) ((Tail) = (Tail) ? ((Tail)->Next = Node) : ((Head) = Node))
+
+#define DLL_PUSH_TAIL(Head, Tail, Node) ((Tail) = ((Tail) ? (Node)->Prev = (Tail), (Tail)->Next = (Node) : (Head) = (Node)))
+#define DLL_POP_TAIL(Head, Tail) ((Tail) == (Head) ? (Tail) = 0, (Head) = 0 : (Tail) = (Tail)->Prev)
+
+#define DECIMAL_DIGIT_COUNT_MAX(type) (241 * sizeof(type) / 100 + 1)
+
 
 ///////////////////////////////////////////////////////////////////////
 // Types
@@ -273,7 +278,7 @@ enum arena_push_flags : u32
 void        MemoryCopy(u64 Size, void *Source, void *Dest);
 void        MemoryCopyOverlapped(u64 Size, void *Source, void *Dest);
 void        MemoryZero(u64 Size, void *Memory);
-bool        MemoryIsEqual(u64 Size, void *A, void *B);
+bool        MemoryCompare(u64 Size, void *A, void *B);
 
 bool        IsPowerOfTwo(u64 x);
 u64         AlignUp(u64 Value, u64 Align);
@@ -1094,3 +1099,14 @@ inline m4x4 OrthographicProjection2D(f32 Left, f32 Right, f32 Bottom, f32 Top)
     
     return Result;
 }
+
+///////////////////////////////////////////////////////////////////////
+// Error Messages
+//
+
+struct error_msg {
+    error_msg *Next;
+    error_msg *Prev;
+    u64 ArenaPos;
+    string Message;
+};

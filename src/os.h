@@ -11,16 +11,38 @@
 
 typedef s32 os_file_handle;
 
-void OS_CloseFile(os_file_handle Handle);
+enum os_file_info {
+    OS_FileInfo_Error,
+    OS_FileInfo_File,
+    OS_FileInfo_Directory,
+};
 
-bool                   OS_FileExists(string FilePath);
-u64                    OS_GetFileSize(string FilePath);
-string                 OS_GetExecutablePath(arena *Arena);
+struct os_directory_iterator {
+    void *Handle;
+};
 
-string                 OS_ReadEntireFile(arena *Arena, string FilePath);
-bool                   OS_WriteEntireFile(u64 Size, u8 *Contents, string FilePath);
+struct os_filesystem_entry {
+    string Name;
+    os_file_info Info;
+};
 
-bool                   OS_DeleteFile(string FilePath);
+bool                    OS_FileExists(string FilePath);
+os_file_info            OS_GetFileInfo(string Path);
+u64                     OS_GetFileSize(string FilePath);
+string                  OS_GetExecutablePath(arena *Arena);
+string                  OS_CanonicalAbsolutePath(arena *Arena, string Path);
+
+os_directory_iterator   OS_DirectoryIterator(string DirectoryPath);
+void                    OS_DirectoryIteratorClose(os_directory_iterator *Iter);
+bool                    OS_DirectoryIteratorIsOk(os_directory_iterator Iter);
+os_filesystem_entry     OS_DirectoryIteratorNext(arena *Arena, os_directory_iterator *Iter);
+
+string                  OS_ReadEntireFile(arena *Arena, string FilePath);
+bool                    OS_WriteEntireFile(u64 Size, u8 *Contents, string FilePath);
+
+bool                    OS_DeleteFile(string FilePath);
+void                    OS_CloseFile(os_file_handle Handle);
+
 
 ///////////////////////////////////////////////////////////////////////
 // Memory

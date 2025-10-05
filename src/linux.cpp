@@ -7,14 +7,9 @@
 #include <sys/types.h>
 #include <sys/mman.h>
 #include <fcntl.h>
+#include <dirent.h> // closedir, opendir
 
 #include <time.h> // clock_gettime, CLOCK_MONOTONIC
-
-
-void OS_CloseFile(os_file_handle Handle) 
-{
-    close((int)Handle);
-}
 
 // TODO: Maybe allow direcotries to return true
 // If we do this, then we can use access().
@@ -34,6 +29,25 @@ bool OS_FileExists(string FilePath)
     ReleaseScratch(Scratch);
     
     return Exists;
+}
+
+os_file_info OS_GetFileInfo(string Path) {
+    temp_arena Scratch = GetScratch();
+
+    u8 *NullTerminatedPath = PushCString(Scratch.Arena, Path);
+
+    os_file_info Info = OS_FileInfo_Error;
+    struct stat Stat = {};
+    int Result = stat((char *)NullTerminatedPath, &Stat);
+    if (Result == 0) {
+        // Everythings thats not a dir is a file
+        // If its a symlink stat should return info about the thing that is linked
+        Info = S_ISDIR(Stat.st_mode) ? OS_FileInfo_Directory : OS_FileInfo_File;
+    }
+
+    ReleaseScratch(Scratch);
+
+    return Info;
 }
 
 u64 OS_GetFileSize(string FilePath)
@@ -72,6 +86,80 @@ string OS_GetExecutablePath(arena *Arena)
     }
     
     return Path;
+}
+
+string OS_CanonicalAbsolutePath(arena *Arena, string Path) {
+    string Result = {};
+
+    temp_arena Scratch = GetScratch(Arena);
+
+    u8 *NullTerminatedPath = PushCString(Scratch.Arena, Path);
+
+    u64 BufferSize = PATH_MAX+1;
+    u8 *Buffer = PushArrayNoZero(Arena, BufferSize, u8);
+    u8 *AbsolutePath = (u8 *)realpath((char *)NullTerminatedPath, (char *)Buffer);
+    if (AbsolutePath) {
+        u64 Length = StringLength(Buffer);
+        // TODO: End with '/' if directory
+        //Buffer[Length] = '/';
+        //Length += 1;
+        Result = CreateString(Buffer, Length);
+        PopSize(Arena, BufferSize - Length);
+    }
+
+    ReleaseScratch(Scratch);
+
+    return Result;
+}
+
+os_directory_iterator OS_DirectoryIterator(string DirectoryPath) {
+    temp_arena Scratch = GetScratch();
+
+    u8 *NullTerminatedDirectoryPath = PushCString(Scratch.Arena, DirectoryPath);
+    DIR *Dir = opendir((char *)NullTerminatedDirectoryPath);
+    os_directory_iterator Iter = {
+        .Handle = (void *)Dir,
+    };
+
+    ReleaseScratch(Scratch);
+    return Iter;
+}
+
+void OS_DirectoryIteratorClose(os_directory_iterator *Iter) {
+    closedir((DIR *)Iter->Handle);
+    *Iter = {};
+}
+
+bool OS_DirectoryIteratorIsOk(os_directory_iterator Iter) {
+    return Iter.Handle != 0;
+}
+
+os_filesystem_entry OS_DirectoryIteratorNext(arena *Arena, os_directory_iterator *Iter) {
+    os_filesystem_entry FilesystemEntry = {};
+    // TODO: This isn't very good, probably want to separate error and empty directory cases more clearly.
+    FilesystemEntry.Info = OS_FileInfo_Error;
+
+    for (struct dirent *Entry = readdir((DIR *)Iter->Handle);
+         Entry != 0;
+         Entry = readdir((DIR *)Iter->Handle)) {
+        if ((Entry->d_name[0] == '.' && Entry->d_name[1] == 0) ||
+            (Entry->d_name[0] == '.' && Entry->d_name[1] == '.' && Entry->d_name[2] == 0)) {
+            continue;
+        }
+
+        if (Entry->d_type == DT_DIR) {
+            FilesystemEntry.Info = OS_FileInfo_Directory;
+            FilesystemEntry.Name = PushStringf(Arena, "%s/", Entry->d_name);
+        }
+        else {
+            FilesystemEntry.Info = OS_FileInfo_File;
+            FilesystemEntry.Name = PushString(Arena, CreateString((u8 *)Entry->d_name));
+        }
+
+        break;
+    }
+
+    return FilesystemEntry;
 }
 
 string OS_ReadEntireFile(arena *Arena, string FilePath)
@@ -148,6 +236,12 @@ bool OS_DeleteFile(string FilePath)
     
     return Success;
 }
+
+void OS_CloseFile(os_file_handle Handle) 
+{
+    close((int)Handle);
+}
+
 
 ///////////////////////////////////////////////////////////////////////
 // Memory

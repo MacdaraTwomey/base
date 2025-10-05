@@ -7,11 +7,20 @@
 #include "base.h"
 
 ///////////////////////////////////////////////////////////////////////
-// Arena
+// Globals
 //
 
 // TODO: Make thread local
 static arena *GlobalScratchArenaPool[2] = {};
+
+
+static arena *GlobalErrorArena = 0;
+static error_msg *GlobalErrorListHead = 0;
+static error_msg *GlobalErrorListTail = 0;
+
+///////////////////////////////////////////////////////////////////////
+// Arena
+//
 
 // TODO: Query page size
 #define ARENA_HEADER_SIZE 64
@@ -24,23 +33,29 @@ static_assert(sizeof(arena) <= ARENA_HEADER_SIZE, "Must be able to fit arena str
 // It removes some annoying checks from calling code.
 void MemoryCopy(u64 Size, void *Source, void *Dest)
 {
-    Assert(Source != nullptr && Dest != nullptr);
-    memcpy(Dest, Source, Size);
+    if (Size > 0) {
+        Assert(Source != nullptr && Dest != nullptr);
+        memcpy(Dest, Source, Size);
+    }
 }
 
 void MemoryCopyOverlapped(u64 Size, void *Source, void *Dest)
 {
-    Assert(Source != nullptr && Dest != nullptr);
-    memmove(Dest, Source, Size);
+    if (Size > 0) {
+        Assert(Source != nullptr && Dest != nullptr);
+        memmove(Dest, Source, Size);
+    }
 }
 
 void MemoryZero(u64 Size, void *Memory)
 {
-    Assert(Memory != nullptr);
-    memset(Memory, 0, Size);
+    if (Size > 0) {
+        Assert(Memory != nullptr);
+        memset(Memory, 0, Size);
+    }
 }
 
-bool MemoryIsEqual(u64 Size, void *A, void *B)
+bool MemoryCompare(u64 Size, void *A, void *B)
 {
     Assert(A != nullptr);
     Assert(B != nullptr);
@@ -429,6 +444,7 @@ string PushStringfArgs(arena *Arena, char *Format, va_list Args)
     {
         // Success
         Length = (u64)RequiredCharCount;
+        PopSize(Arena, Capacity - Length);
     }
     
     va_end (ArgsCopy);
@@ -911,4 +927,51 @@ static u64 Murmur64Finaliser(u64 Value) {
 
 u64 Hash64(u64 Value) {
     return Murmur64Finaliser(Value);
+}
+
+
+///////////////////////////////////////////////////////////////////////
+// Error Messages
+//
+
+void Error_PushMessage(string Message) {
+    if (!GlobalErrorArena) {
+        GlobalErrorArena = CreateArena(GB(8));
+    }
+
+    u64 ArenaPos = GlobalErrorArena->Pos;
+    error_msg *Error = PushStruct(GlobalErrorArena, error_msg);
+    Error->Message = PushString(GlobalErrorArena, Message);
+    Error->ArenaPos = GlobalErrorArena->Pos;
+    DLL_PUSH_TAIL(GlobalErrorListHead, GlobalErrorListTail, Error);
+}
+
+void Error_PushMessagef(char *Format, ...) {
+    if (!GlobalErrorArena) {
+        GlobalErrorArena = CreateArena(GB(8));
+    }
+
+    u64 ArenaPos = GlobalErrorArena->Pos;
+
+    va_list Args;
+    va_start (Args, Format);
+    string Message = PushStringfArgs(GlobalErrorArena, Format, Args);
+    va_end (Args);
+
+    error_msg *Error = PushStruct(GlobalErrorArena, error_msg);
+    Error->Message = PushString(GlobalErrorArena, Message);
+    Error->ArenaPos = GlobalErrorArena->Pos;
+    DLL_PUSH_TAIL(GlobalErrorListHead, GlobalErrorListTail, Error);
+}
+
+string Error_PopMessage(arena *Arena) {
+    string Message = {};
+    error_msg *Error = GlobalErrorListTail;
+    if (Error) {
+        DLL_POP_TAIL(GlobalErrorListHead, GlobalErrorListTail);
+        Message = PushString(Arena, Error->Message);
+        PopToPosition(GlobalErrorArena, Error->ArenaPos);
+    }
+
+    return Message;
 }

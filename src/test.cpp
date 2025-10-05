@@ -710,7 +710,7 @@ void RunTests()
         
         string RoundTripFile = OS_ReadEntireFile(Arena, WriteFilePath);
         Assert(RoundTripFile.Length == sizeof(Data));
-        Assert(MemoryIsEqual(sizeof(Data), Data, RoundTripFile.Str));
+        Assert(MemoryCompare(sizeof(Data), Data, RoundTripFile.Str));
         
         Assert(OS_DeleteFile(WriteFilePath));
         

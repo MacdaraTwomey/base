@@ -24,6 +24,17 @@
             "symbolSearchPath": "${workspaceFolder}/code",
             "console": false,
             "visualizerFile": "${workspaceFolder}/my.natvis",
+        },
+        {
+            "type": "lldb-dap",
+            "request": "launch",
+            "name": "LLDB DAP",
+            "program": "${workspaceFolder}/build/test.exe",
+            "args": [ "test" ],
+            "env": {
+                "ASAN_OPTIONS": "detect_leaks=0",
+            },
+            "console": "integratedTerminal",
         }
     ],
 }
