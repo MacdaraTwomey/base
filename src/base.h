@@ -638,10 +638,12 @@ inline v2s V2S(s32 x, s32 y)
 
 inline v2 operator+(v2 A, v2 B)          { return v2{A.x+B.x, A.y+B.y}; } 
 inline v2 operator-(v2 A, v2 B)          { return v2{A.x-B.x, A.y-B.y}; } 
-inline v2 operator-(v2 A)                { return v2{-A.x,   -A.y}; }           
+inline v2 operator-(v2 A)                { return v2{-A.x,   -A.y}; }     
 
 inline v2 operator*(f32 Scalar, v2 A)    { return v2{Scalar*A.x, Scalar*A.y}; }     
+inline v2 operator/(f32 Scalar, v2 A)    { return v2{Scalar/A.x, Scalar/A.y}; }
 inline v2 operator*(v2 A, f32 Scalar)    { return Scalar * A; }
+inline v2 operator/(v2 A, f32 Scalar)    { return (1.0f / Scalar) * A; } 
 
 inline v2& operator+=(v2& A, v2 B)       { return (A = A + B); }
 inline v2& operator-=(v2& A, v2 B)       { return (A = A - B); }
@@ -688,9 +690,19 @@ inline f32 Inner(v2 A, v2 B)
     return A.x*B.x + A.y*B.y;
 }
 
-inline v2 Perp(v2 A)
+inline v2 PerpCCW(v2 A)
 {
     return v2{-A.y, A.x};
+}
+
+inline v2 PerpCW(v2 A)
+{
+    return v2{A.y, -A.x};
+}
+
+inline v2 Perp(v2 A)
+{
+    return PerpCCW(A);
 }
 
 inline v2 Hadamard(v2 A, v2 B)
