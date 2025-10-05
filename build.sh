@@ -10,6 +10,7 @@ ArgCount=$#
 Root=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 OS=$1
+if [[ $ArgCount != 1 ]] && [[ $ArgCount != 2 ]]; then echo "Usage: build.sh <os>" && exit 1; fi
 if [[ $ArgCount == 2 ]]; then LinuxOutputPathType=$2; fi
 
 # ------------ Flags and sources -------------------------------------------------
@@ -45,7 +46,8 @@ if [[ $OS == "linux" ]] || [[ $OS == "win" ]]; then Flags+=" $ClangFlags"; fi
 if [[ $OS == "msvc" ]]; 					   then Flags+=" $ClFlags"; fi
 
 # ------------ Compile -----------------------------------------------------------
-pushd build > /dev/null
+mkdir -p "$Root/build"
+pushd "$Root/build" > /dev/null
 
 CMD="$Compiler $Source $Include $Flags $Link $Out$Executable"
 echo "$CMD"

@@ -442,7 +442,7 @@ union v2
     f32 E[2];
 };
 
-struct v2s
+union v2s
 {
     struct { s32 x, y; };
     struct { s32 Width, Height; };
@@ -586,6 +586,13 @@ constexpr f32 RadFromDeg(f32 Degrees)
 constexpr f32 DegFromRad(f32 Radians)
 {
     return Radians * 57.295779513082320876798154814105f;
+}
+
+inline u32 RoundToU32(f32 X)
+{
+    Assert(X > -0.5f);
+    u32 result = (u32)roundf(X);
+    return result;
 }
 
 //

@@ -1,7 +1,6 @@
 
 #include "platform.h"
 #include "base.h"
-#include "base.cpp"
 
 #include <unistd.h>
 #include <sys/stat.h>
