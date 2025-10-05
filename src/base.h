@@ -15,9 +15,8 @@
 // NOTE: Things to consider
 // - Currently the math functions are in the header forcing us to include math.h here. They need to be in the 
 //   header if there are to be marked inline. I think I would prefer they be in the .cpp file. We probably need
-//   a cpp file because we need to include platform.h somewhere and it is maybe cleaner than having a #define 
+//   a cpp file because we need to include os.h somewhere and it is maybe cleaner than having a #define 
 //   BASE_IMPLEMENTATION situation.
-// - Maybe rename platform to OS, which is shorter and a better prefix for types.
 
 ///////////////////////////////////////////////////////////////////////
 // Platform detection
@@ -190,6 +189,8 @@ constexpr size_t ArrayCount(T(&)[n])
     return n;
 }
 
+#define SLL_APPEND(Head, Tail, Node) ((Tail) = (Tail) ? ((Tail)->Next = Node) : ((Head) = Node))
+
 ///////////////////////////////////////////////////////////////////////
 // Types
 //
@@ -229,8 +230,7 @@ static_assert(sizeof(u64) == sizeof(s64), "");
 //
 
 // From sanitizer/asan_interface.h
-//#if (__has_feature(address_sanitizer) || defined(__SANITIZE_ADDRESS__))
-#if defined(__SANITIZE_ADDRESS__)
+#if __has_feature(address_sanitizer) || defined(__SANITIZE_ADDRESS__)
 #  define ASAN_ENABLED 1
 #else
 #  define ASAN_ENABLED 0
@@ -303,6 +303,7 @@ temp_arena  GetScratchImpl(u32 ConflictCount, conflicting_arena_array Conflicts)
 #define PushArray(Arena, Count, Type) (Type *)PushSize_((Arena), (Count)*sizeof(Type), alignof(Type), ArenaPushFlags_ClearToZero)
 #define PushArrayNoZero(Arena, Count, Type) (Type *)PushSize_((Arena), (Count)*sizeof(Type), alignof(Type), ArenaPushFlags_None)
 #define PushStruct(Arena, Type) (Type *)PushSize_((Arena), sizeof(Type), alignof(Type), ArenaPushFlags_ClearToZero)
+#define PushCopy(Arena, Count, Type, Source) (Type *)PushCopy_((Arena), ((Count) * sizeof(Type)), (Source), alignof(Type))
 
 ///////////////////////////////////////////////////////////////////////
 // String
@@ -336,11 +337,13 @@ struct string_list
     string_node *Head;
     string_node *Tail;
     u64 Length;
+    u64 Count;
 };
 
 // We could make a StrLitStruct that does a case of memory to u8 * and uses sizeof struct
 // this lets you use StringListJoin on structs.
-#define StrLit(lit) string{(u8 *)(lit), sizeof(lit) - 1} 
+#define Strlit(lit) string{(u8 *)(lit), sizeof(lit) - 1} 
+#define StrVal(String) (int)(String).Length, (String).Str
 
 string CreateString(u8 *CString);
 string CreateString(u8 *StringData, u64 Length);
@@ -392,8 +395,7 @@ void StringListAppend(arena *Arena, string_list *List, string String);
 void StringListAppend(arena *Arena, string_list *List, char *String);
 string StringListJoin(arena *Arena, string_list *List);
 string_list StringListSplit(arena *Arena, string String, string Splits);
-template<typename... Ts>
-string StringConcat(arena *Arena, Ts... args);
+template<typename... Ts> string StringConcat(arena *Arena, Ts... args);
 
 
 struct parsed_num
@@ -624,6 +626,11 @@ inline v4 V4(v3 xyz, f32 w)
     return v4{xyz.x, xyz.y, xyz.z, w};
 }
 
+inline v2s V2S(s32 x, s32 y)
+{
+    return v2s{x, y};
+}
+
 inline v2 operator+(v2 A, v2 B)          { return v2{A.x+B.x, A.y+B.y}; } 
 inline v2 operator-(v2 A, v2 B)          { return v2{A.x-B.x, A.y-B.y}; } 
 inline v2 operator-(v2 A)                { return v2{-A.x,   -A.y}; }           
@@ -662,6 +669,14 @@ inline v4& operator+=(v4& A, v4 B)       { return (A = A + B); }
 inline v4& operator-=(v4& A, v4 B)       { return (A = A - B); }
 inline v4& operator*=(v4& A, f32 Scalar) { return (A = Scalar * A); }
 inline v4& operator/=(v4& A, f32 Scalar) { return (A = A / Scalar); }
+
+inline v2s operator+(v2s A, v2s B)       { return v2s{A.x+B.x, A.y+B.y}; } 
+inline v2s operator-(v2s A, v2s B)       { return v2s{A.x-B.x, A.y-B.y}; } 
+inline v2s operator-(v2s A)              { return v2s{-A.x,   -A.y}; }           
+
+inline v2s& operator+=(v2s& A, v2s B)    { return (A = A + B); }
+inline v2s& operator-=(v2s& A, v2s B)    { return (A = A - B); }
+
 
 inline f32 Inner(v2 A, v2 B)
 {

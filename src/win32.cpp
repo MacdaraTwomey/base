@@ -1,7 +1,6 @@
 
 #include "base.h"
-#include "platform.h"
-#include "base.cpp"
+#include "os.h"
 
 #include "win32_opengl.cpp"
 #include "opengl.cpp"
@@ -12,7 +11,12 @@ static bool GlobalAppRunning = false;
 
 //
 // TODO:
-// - PLATFORM_ERROR_MESSAGE to make message box?
+// - OS__ERROR_MESSAGE to make message box?
+
+void OS_CloseFile(os_file_handle Handle) 
+{
+    Assert(!"Unimplemented for windows");
+}
 
 HANDLE Win32CreateConsole()
 {
@@ -77,7 +81,7 @@ wchar_t *UTF16FromUTF8(arena *Arena, u8 *String8, int String8Length)
     return Buffer;
 }
 
-string PlatformGetExecutablePath(arena *Arena)
+string OS_GetExecutablePath(arena *Arena)
 {
     string Path = {};
     
@@ -100,7 +104,7 @@ string PlatformGetExecutablePath(arena *Arena)
 }
 
 // TODO: Maybe allow this to return true if the file is a directory
-bool PlatformFileExists(string FilePath)
+bool OS_FileExists(string FilePath)
 {
     temp_arena Scratch = GetScratch();
     
@@ -114,7 +118,7 @@ bool PlatformFileExists(string FilePath)
     return Exists && !IsDirectory;
 }
 
-u64 PlatformGetFileSize(string FilePath)
+u64 OS_GetFileSize(string FilePath)
 {
     u64 Result = 0;
     
@@ -138,7 +142,7 @@ u64 PlatformGetFileSize(string FilePath)
     return Result;
 }
 
-string PlatformReadEntireFile(arena *Arena, string FilePath)
+string OS_ReadEntireFile(arena *Arena, string FilePath)
 {
     string Contents = {};
     
@@ -200,7 +204,7 @@ string PlatformReadEntireFile(arena *Arena, string FilePath)
 }
 
 // Creates a file or replaces an existing file.
-bool PlatformWriteEntireFile(u64 Size, u8 *Contents, string FilePath)
+bool OS_WriteEntireFile(u64 Size, u8 *Contents, string FilePath)
 {
     temp_arena Scratch = GetScratch();
     
@@ -243,7 +247,7 @@ bool PlatformWriteEntireFile(u64 Size, u8 *Contents, string FilePath)
 }
 
 // TODO: Handle deleteing directories
-bool PlatformDeleteFile(string FilePath)
+bool OS_DeleteFile(string FilePath)
 {
     temp_arena Scratch = GetScratch();
     
@@ -255,14 +259,14 @@ bool PlatformDeleteFile(string FilePath)
     return Success;
 }
 
-void *PlatformMemoryReserve(u64 Size)
+void *OS_MemoryReserve(u64 Size)
 {
     Assert(Size > 0);
     void *Memory = VirtualAlloc(0, Size, MEM_RESERVE, PAGE_NOACCESS);
     return Memory;
 }
 
-bool PlatformMemoryCommit(void *Address, u64 Size)
+bool OS_MemoryCommit(void *Address, u64 Size)
 {
     // Can succeed even if Address is NULL
     // Does not fail if you try to commit an already commited page
@@ -274,7 +278,7 @@ bool PlatformMemoryCommit(void *Address, u64 Size)
     return Success;
 }
 
-void PlatformMemoryDecommit(void *Address, u64 Size)
+void OS_MemoryDecommit(void *Address, u64 Size)
 {
     // Frees all pages with a byte in the range from Address to Address+Size
     Assert(Address);
@@ -284,7 +288,7 @@ void PlatformMemoryDecommit(void *Address, u64 Size)
     Assert(Success);
 }
 
-void PlatformMemoryFree(void *Address, u64)
+void OS_MemoryFree(void *Address, u64)
 {
     // Decommits all commited pages and releases reserved memory region
     Assert(Address);
@@ -292,7 +296,7 @@ void PlatformMemoryFree(void *Address, u64)
     Assert(Success);
 }
 
-void PlatformMemoryGuard(void *Address, u64 Size)
+void OS_MemoryGuard(void *Address, u64 Size)
 {
     Assert(Address);
     Assert(Size > 0);
@@ -306,7 +310,7 @@ void PlatformMemoryGuard(void *Address, u64 Size)
     Assert(Success);
 }
 
-void PlatformMemoryRemoveGuard(void *Address, u64 Size)
+void OS_MemoryRemoveGuard(void *Address, u64 Size)
 {
     Assert(Address);
     Assert(Size > 0);
@@ -434,3 +438,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
 }
 #endif
 
+u64 OS_GetWallClockMicroseconds() {
+    Assert(!"Unimplemented for windows");
+    return 0;
+}

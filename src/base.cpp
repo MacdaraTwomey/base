@@ -3,7 +3,7 @@
 #include <stdio.h> // vsnprintf,
 #include <string.h> // memset, memcpy, memmove
 
-#include "platform.h"
+#include "os.h"
 #include "base.h"
 
 ///////////////////////////////////////////////////////////////////////
@@ -79,11 +79,11 @@ arena *CreateArena(u64 ReserveSize)
     // when you commit the pages.
     // On linux page tables are only used when the memory is touched because of overcommit.
     u64 AlignedReserveSize = AlignUp(ReserveSize, PAGE_SIZE);
-    void *Memory = PlatformMemoryReserve(AlignedReserveSize);
+    void *Memory = OS_MemoryReserve(AlignedReserveSize);
     if (Memory)
     {
         u32 CommitSize = PAGE_SIZE;
-        if (PlatformMemoryCommit(Memory, CommitSize))
+        if (OS_MemoryCommit(Memory, CommitSize))
         {
             Arena = (arena *)Memory;
             
@@ -97,7 +97,7 @@ arena *CreateArena(u64 ReserveSize)
         }
         else
         {
-            PlatformMemoryFree(Memory, AlignedReserveSize);
+            OS_MemoryFree(Memory, AlignedReserveSize);
         }
     }
     
@@ -108,7 +108,7 @@ arena *CreateArena(u64 ReserveSize)
 
 void FreeArena(arena *Arena)
 {
-    PlatformMemoryFree(Arena->Base, Arena->Reserve);
+    OS_MemoryFree(Arena->Base, Arena->Reserve);
 }
 
 // Now that this function can return NULL, it means you always need to check the pointer before copying
@@ -154,7 +154,7 @@ void *PushSize_(arena *Arena, u64 Size, u32 Alignment, u32 ArenaPushFlags)
             u64 TotalCommitSize = AlignUp(NewPos, COMMIT_CHUNK_SIZE);
             u64 NewCommit = ClampTop(TotalCommitSize, Arena->Reserve);
             u64 NewCommitSize = NewCommit - Arena->Commit;
-            if (PlatformMemoryCommit(Arena->Base + Arena->Commit, NewCommitSize))
+            if (OS_MemoryCommit(Arena->Base + Arena->Commit, NewCommitSize))
             {
                 Arena->Commit = NewCommit;
                 static_assert(COMMIT_CHUNK_SIZE % 8 == 0, "Commit chunks must be 8 byte aligned for ASan");
@@ -208,7 +208,7 @@ void PopToPosition(arena *Arena, u64 Position)
     {
         u64 NewCommit = TestCommit;
         u64 DecommitSize = Arena->Commit - NewCommit;
-        PlatformMemoryDecommit(Arena->Base + NewCommit, DecommitSize);
+        OS_MemoryDecommit(Arena->Base + NewCommit, DecommitSize);
         Arena->Commit = NewCommit;
     }
     
@@ -806,6 +806,7 @@ void StringListAppend(arena *Arena, string_list *List, string String)
     
     List->Tail = Node;
     List->Length += String.Length;
+    List->Count += 1;
 }
 
 void StringListAppend(arena *Arena, string_list *List, char *String)
@@ -856,6 +857,13 @@ string StringConcat(arena *Arena, Ts... args)
     return CreateString(StringMemory, CopiedLength);
 }
 
+// Instatiate all all versions of this function we will want to use, rather than having each translation unit
+// instantiate its own (possibly duplicate versions).
+template string StringConcat(arena *, string, string);
+template string StringConcat(arena *, string, string, string);
+template string StringConcat(arena *, string, string, string, string);
+template string StringConcat(arena *, string, string, string, string, string);
+
 string_list StringListSplit(arena *Arena, string String, string Splits)
 {
     string_list List = {};
@@ -889,4 +897,18 @@ string_list StringListSplit(arena *Arena, string String, string Splits)
     }
     
     return List;
+}
+
+// This is not a real hash function
+static u64 Murmur64Finaliser(u64 Value) {
+    Value ^= Value >> 33;
+    Value *= 0xff51afd7ed558ccdULL;
+    Value ^= Value >> 33;
+    Value *= 0xc4ceb9fe1a85ec53ULL;
+    Value ^= Value >> 33;
+    return Value;
+}
+
+u64 Hash64(u64 Value) {
+    return Murmur64Finaliser(Value);
 }

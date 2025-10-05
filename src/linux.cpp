@@ -1,5 +1,5 @@
 
-#include "platform.h"
+#include "os.h"
 #include "base.h"
 
 #include <unistd.h>
@@ -8,9 +8,17 @@
 #include <sys/mman.h>
 #include <fcntl.h>
 
+#include <time.h> // clock_gettime, CLOCK_MONOTONIC
+
+
+void OS_CloseFile(os_file_handle Handle) 
+{
+    close((int)Handle);
+}
+
 // TODO: Maybe allow direcotries to return true
 // If we do this, then we can use access().
-bool PlatformFileExists(string FilePath)
+bool OS_FileExists(string FilePath)
 {
     temp_arena Scratch = GetScratch();
     u8 *PathZ  = PushCString(Scratch.Arena, FilePath);
@@ -28,7 +36,7 @@ bool PlatformFileExists(string FilePath)
     return Exists;
 }
 
-u64 PlatformGetFileSize(string FilePath)
+u64 OS_GetFileSize(string FilePath)
 {
     temp_arena Scratch = GetScratch();
     u8 *PathZ  = PushCString(Scratch.Arena, FilePath);
@@ -49,7 +57,7 @@ u64 PlatformGetFileSize(string FilePath)
     return Size;
 }
 
-string PlatformGetExecutablePath(arena *Arena)
+string OS_GetExecutablePath(arena *Arena)
 {
     string Path = {};
     
@@ -66,7 +74,7 @@ string PlatformGetExecutablePath(arena *Arena)
     return Path;
 }
 
-string PlatformReadEntireFile(arena *Arena, string FilePath)
+string OS_ReadEntireFile(arena *Arena, string FilePath)
 {
     string Contents = {};
     
@@ -104,7 +112,7 @@ string PlatformReadEntireFile(arena *Arena, string FilePath)
     return Contents;
 }
 
-bool PlatformWriteEntireFile(u64 Size, u8 *Contents, string FilePath)
+bool OS_WriteEntireFile(u64 Size, u8 *Contents, string FilePath)
 {
     Assert(Size <= S64Max);
     
@@ -129,7 +137,7 @@ bool PlatformWriteEntireFile(u64 Size, u8 *Contents, string FilePath)
     return Success;
 }
 
-bool PlatformDeleteFile(string FilePath)
+bool OS_DeleteFile(string FilePath)
 {
     temp_arena Scratch = GetScratch();
     
@@ -147,7 +155,7 @@ bool PlatformDeleteFile(string FilePath)
 
 // All this memory stuff still relies on overcommit.
 
-void *PlatformMemoryReserve(u64 Size)
+void *OS_MemoryReserve(u64 Size)
 {
     Assert(Size > 0);
     Assert(sysconf(_SC_PAGE_SIZE) == 4096);
@@ -162,11 +170,11 @@ void *PlatformMemoryReserve(u64 Size)
 }
 
 // I don't know if this is correct
-bool PlatformMemoryCommit(void *Address, u64 Size)
+bool OS_MemoryCommit(void *Address, u64 Size)
 {
     Assert(Address);
     Assert(Size > 0);
-    PlatformMemoryRemoveGuard(Address, Size);
+    OS_MemoryRemoveGuard(Address, Size);
     // Ideally we would zero the memory here to make similar to windows, but this doesn't work when using 
     // AddressSanitizer as we haven't unpoisoned our memory yet. But if we are using address sanitizer we
     // don't have much to worry about.
@@ -174,25 +182,25 @@ bool PlatformMemoryCommit(void *Address, u64 Size)
 }
 
 // I don't know if this is correct
-void PlatformMemoryDecommit(void *Address, u64 Size)
+void OS_MemoryDecommit(void *Address, u64 Size)
 {
     Assert(Address);
     Assert(Size > 0);
     
-    PlatformMemoryGuard(Address, Size);
+    OS_MemoryGuard(Address, Size);
     // MADV_DONTNEED
     // Do not expect access in the near future. (For the time being, the application is finished with the given range, so the kernel can free resources associated with it.) Subsequent accesses of pages in this range will succeed, but will result either in reloading of the memory contents from the underlying mapped file (see mmap(2)) or zero-fill-on-demand pages for mappings without an underlying file. 
     madvise(Address, Size, MADV_DONTNEED); 
 }
 
-void PlatformMemoryFree(void *Address, u64 Size)
+void OS_MemoryFree(void *Address, u64 Size)
 {
     Assert(Address);
     Assert(Size > 0);
     munmap(Address, Size);
 }
 
-void PlatformMemoryGuard(void *Address, u64 Size)
+void OS_MemoryGuard(void *Address, u64 Size)
 {
     Assert(Address);
     Assert(Size > 0);
@@ -202,7 +210,7 @@ void PlatformMemoryGuard(void *Address, u64 Size)
     mprotect(Address, Size, PROT_NONE);
 }
 
-void PlatformMemoryRemoveGuard(void *Address, u64 Size)
+void OS_MemoryRemoveGuard(void *Address, u64 Size)
 {
     Assert(Address);
     Assert(Size > 0);
@@ -210,4 +218,14 @@ void PlatformMemoryRemoveGuard(void *Address, u64 Size)
     Assert((Size & (4096 - 1)) == 0);
     
     mprotect(Address, Size, PROT_READ|PROT_WRITE);
+}
+
+u64 OS_GetWallClockMicroseconds()
+{
+    // We could just return nanoseconds, which can fix another 584 years in a u64, 
+    // then we wouldn't need to divide nanoseconds.
+    timespec Now = {};
+    clock_gettime(CLOCK_MONOTONIC, &Now);
+    u64 Time = (Now.tv_sec * 1000) + (Now.tv_nsec / 1000000);
+    return Time;
 }

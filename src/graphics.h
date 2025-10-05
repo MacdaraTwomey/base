@@ -48,11 +48,3 @@ v3 Orbit(v3 CameraP, v3 Target, f32 AzimuthRadians, f32 InclinationRadians)
     
     return Result;
 }
-
-
-
-
-bool PlatformInitOpenGL()
-{
-    
-}

@@ -1,4 +1,5 @@
 
+#include "base.cpp"
 #include "test.cpp"
 
 #if BASE_OS_WINDOWS

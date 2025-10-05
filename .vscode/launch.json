@@ -10,6 +10,9 @@
             "request": "launch",
             "program": "${workspaceFolder}/build/test.exe",
             "cwd": "${workspaceFolder}",
+            //"env": {"LD_LIBRARY_PATH": "build"},
+            //"args": ["build/test"],
+            //"terminal": "integrated"
         },
         {
             // This debugs programs compiled with clang.exe (and probably MSVC).

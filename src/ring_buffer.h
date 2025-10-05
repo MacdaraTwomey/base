@@ -8,7 +8,7 @@
 // Ring Buffer
 //
 
-struct platform_ring_buffer_memory 
+struct os_ring_buffer_memory 
 {
     u8 *Address;
     u64 Size;
@@ -41,7 +41,7 @@ u8 *Win32FindAddressForSize(HANDLE MapFileHandle, u64 Size)
     return Address;
 }
 
-bool PlatformAllocateRingBufferMemory(platform_ring_buffer_memory *RingBufferMemory, u64 Size)
+bool OS_AllocateRingBufferMemory(os_ring_buffer_memory *RingBufferMemory, u64 Size)
 {
     // MapViewOfFileEx takes a base address which must be on an memory allocation granularity boundary (64 KB).
     // So the ring size must be a multiple of 64 KB (as the adjacent mapped memory is contiguous).
@@ -108,7 +108,7 @@ bool PlatformAllocateRingBufferMemory(platform_ring_buffer_memory *RingBufferMem
     return Success;
 }
 
-void PlatformFreeRingBufferMemory(u8 *Address, u64 Size, void *Handle)
+void OS_FreeRingBufferMemory(u8 *Address, u64 Size, void *Handle)
 {
     Assert(Address);
     Assert(Size);
@@ -144,8 +144,8 @@ bool InitRingBuffer(ring_buffer *RingBuffer, u64 Size)
     
     bool Success = false;
     
-    platform_ring_buffer_memory BufferMemory = {};
-    if (PlatformAllocateRingBufferMemory(&BufferMemory, Size))
+    os_ring_buffer_memory BufferMemory = {};
+    if (OS_AllocateRingBufferMemory(&BufferMemory, Size))
     {
         RingBuffer->Memory = BufferMemory.Address;
         RingBuffer->Capacity = BufferMemory.Size;
@@ -165,7 +165,7 @@ void FreeRingBuffer(ring_buffer *RingBuffer)
     Assert(RingBuffer->Memory);
     Assert(RingBuffer->Capacity); 
     Assert(RingBuffer->Handle);
-    PlatformFreeRingBufferMemory(RingBuffer->Memory, RingBuffer->Capacity, RingBuffer->Handle);
+    OS_FreeRingBufferMemory(RingBuffer->Memory, RingBuffer->Capacity, RingBuffer->Handle);
 }
 
 u64 RingBufferFilledSize(ring_buffer *RingBuffer)
