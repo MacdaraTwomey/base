@@ -300,7 +300,11 @@ void OS_MemoryRemoveGuard(void *Address, u64 Size)
 
 HANDLE Win32CreateConsole()
 {
-    AllocConsole();
+    // Attach to existing console
+    BOOL err = AttachConsole((DWORD)-1);
+
+    // Create a new console
+    //AllocConsole();
     
     FILE* fp;
     freopen_s(&fp, "CONOUT$", "w", stdout);
