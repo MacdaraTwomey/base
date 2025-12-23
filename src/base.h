@@ -164,16 +164,9 @@ BASE_DEBUG_TRAP(); \
 // Helpers
 //
 
-template<class T>
-constexpr const T& Clamp(const T& Value, const T& Low, const T& High)
-{
-    Assert(Low <= High);
-    return (Value < Low) ? Low : (High < Value) ? High : Value;
-}
-
 #define Minimum(a, b) ((a) < (b) ? (a) : (b))
 #define Maximum(a, b) ((a) > (b) ? (a) : (b))
-//#define Clamp(Value, Low, High) (((Value) < (Low)) ? (Low) : ((High) < (Value)) ? (High) : (Value))
+#define Clamp(Value, Low, High) (((Value) < (Low)) ? (Low) : ((Value) > (High)) ? (High) : (Value))
 #define ClampTop(a, b)    Minimum((a), (b))
 #define ClampBottom(a, b) Maximum((a), (b))
 
@@ -582,7 +575,7 @@ inline f32 Lerp(f32 A, f32 t, f32 B)
 
 inline f32 Clamp01(f32 Value)
 {
-    return Clamp(0.0f, Value, 1.0f);
+    return Clamp(Value, 0.0f, 1.0f);
 }
 
 constexpr f32 RadFromDeg(f32 Degrees)
