@@ -11,6 +11,11 @@
 
 #include <time.h> // clock_gettime, CLOCK_MONOTONIC
 
+///////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////
+// Filesystem
+//
+
 // TODO: Maybe allow direcotries to return true
 // If we do this, then we can use access().
 bool OS_FileExists(string FilePath)
@@ -244,6 +249,7 @@ void OS_CloseFile(os_file_handle Handle)
 
 
 ///////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////
 // Memory
 //
 
@@ -314,6 +320,11 @@ void OS_MemoryRemoveGuard(void *Address, u64 Size)
     mprotect(Address, Size, PROT_READ|PROT_WRITE);
 }
 
+///////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////
+// Time
+//
+
 u64 OS_GetWallClockMicroseconds()
 {
     // We could just return nanoseconds, which can fix another 584 years in a u64, 
@@ -322,4 +333,30 @@ u64 OS_GetWallClockMicroseconds()
     clock_gettime(CLOCK_MONOTONIC, &Now);
     u64 Time = (Now.tv_sec * 1000) + (Now.tv_nsec / 1000000);
     return Time;
+}
+
+///////////////////////////////////////////////////////////////////////
+// Windowing
+
+
+os_window OS_CreateWindow(u8 *WindowName, u32 Width, u32 Height) {
+    Assert(!"Unimplemented");
+    return {};
+}
+
+void OS_DestroyWindow(os_window Window) {
+    Assert(!"Unimplemented");
+}
+
+void OS_GetEvents(os_window Window, os_input *Input) {
+    Assert(!"Unimplemented");
+}
+
+void OS_SwapBuffers(os_window Window) {
+    Assert(!"Unimplemented");
+}
+
+int main(int ArgCount, char *Args[]) {
+    int AppMain(int ArgCount, char *Args[]);
+    return AppMain(0, NULL);
 }

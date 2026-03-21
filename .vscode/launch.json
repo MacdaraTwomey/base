@@ -8,10 +8,10 @@
             "name": "Debug from linux",
             "type": "lldb",
             "request": "launch",
-            "program": "${workspaceFolder}/build/test.exe",
+            "program": "${workspaceFolder}/target/test",
             "cwd": "${workspaceFolder}",
-            //"env": {"LD_LIBRARY_PATH": "build"},
-            //"args": ["build/test"],
+            //"env": {"LD_LIBRARY_PATH": "target"},
+            //"args": ["target/test"],
             //"terminal": "integrated"
         },
         {
@@ -20,7 +20,7 @@
             "name": "Debug from windows",
             "type": "cppvsdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/test.exe",
+            "program": "${workspaceFolder}/target/test",
             "symbolSearchPath": "${workspaceFolder}/code",
             "console": false,
             "visualizerFile": "${workspaceFolder}/my.natvis",
@@ -29,7 +29,7 @@
             "type": "lldb-dap",
             "request": "launch",
             "name": "LLDB DAP",
-            "program": "${workspaceFolder}/build/test.exe",
+            "program": "${workspaceFolder}/target/test",
             "args": [ "test" ],
             "env": {
                 "ASAN_OPTIONS": "detect_leaks=0",

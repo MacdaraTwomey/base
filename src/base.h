@@ -227,8 +227,7 @@ static_assert(sizeof(u64) == sizeof(s64), "");
 // Arena
 //
 
-// From sanitizer/asan_interface.h
-#if __has_feature(address_sanitizer) || defined(__SANITIZE_ADDRESS__)
+#if defined(__SANITIZE_ADDRESS__)
 #  define ASAN_ENABLED 1
 #else
 #  define ASAN_ENABLED 0
@@ -381,8 +380,8 @@ u64    StringFindLastChar(string String, u8 Char);
 u64    StringFindStr(string Haystack, string Needle);
 bool   StringContainsChar(string String, u8 Char);
 bool   StringContainsStr(string String, string Substr);
-bool   StringsAreEqual(string A, string B);
-bool   StringsAreEqualCaseInsensitive(string a, string b);
+bool   StringMatch(string A, string B);
+bool   StringMatchCaseInsensitive(string a, string b);
 
 u64    StringFindLastSlash(string Path);
 void   RemoveExtension(string *File);

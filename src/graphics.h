@@ -2,49 +2,127 @@
 
 #include "base.h"
 
-inline u32
-RGBAPack4x8(v4 Unpacked)
+enum render_entry_type
 {
-    u32 result = ((RoundToUInt32(Unpacked.a) << 24) |
-                  (RoundToUInt32(Unpacked.b) << 16) |
-                  (RoundToUInt32(Unpacked.g) << 8) |
-                  (RoundToUInt32(Unpacked.r) << 0));
-    
-    return result;
-}
+    RenderEntryType_Clear,
+    RenderEntryType_Clip,
+    RenderEntryType_Line,
+    RenderEntryType_QuadOutline,
+    RenderEntryType_TexturedQuads,
+};
 
-inline u32
-BGRAPack4x8(v4 Unpacked)
+struct render_entry_header
 {
-    u32 result = ((RoundToUInt32(Unpacked.a) << 24) |
-                  (RoundToUInt32(Unpacked.r) << 16) |
-                  (RoundToUInt32(Unpacked.g) << 8) |
-                  (RoundToUInt32(Unpacked.b) << 0));
-    
-    return result;
-}
+    render_entry_type Type;
+};
 
-v3 Orbit(v3 CameraP, v3 Target, f32 AzimuthRadians, f32 InclinationRadians)
+struct render_entry_clear
 {
-    // Transform to spherical coordinates, add azimuth and inclination, then transform back.
-    // Assumes z-is-up right handed coordinate system.
+    v4 ClearColour;
+};
+
+struct render_entry_clip
+{
+    s32 x;
+    s32 y;
+    s32 Width;
+    s32 Height;
+};
+
+struct render_entry_line
+{
+    u32 IndexOffset;
+    f32 LineWidth;
+};
+
+//
+//struct render_entry_quad_outline
+//{
+//u32 IndexOffset;
+//f32 LineWidth;
+//};
+//
+
+// A set of quads using one texture
+struct render_entry_textured_quads
+{
+    u32 IndexOffset;
+    u32 QuadCount;
+    u32 TextureHandle;
+};
+
+struct vertex
+{
+    v2 P;
+    v2 UV;
+    u32 Colour;
+};
+
+// TODO: Render Entry coalescing
+struct render_commands
+{
+    vertex *VertexArray;
+    u32 VertexCount;
+    u32 MaxVertexCount;
     
-    v3 P = CameraP - Target;
+    u32 *IndexArray;
+    u32 IndexCount;
+    u32 MaxIndexCount;
     
-    f32 r = Length(P);
-    P = NOZ(P);
+    u8 *PushBufferBase;
+    u8 *PushBufferAt;
+    u32 PushBufferSize;
     
-    f32 Inclination = ACos(P.z) + InclinationRadians;
-    f32 Azimuth = ATan2(P.y, P.x) + AzimuthRadians;
+    u32 WhiteTextureHandle;
     
-    Inclination = Clamp(Inclination, 0.01f, Pi32 - 0.01f);
+    // Combine textured quad entries that use the same texture (i.e. almost all entries).
+    // This will only be non-null if the last entry in the push buffer was a render_entry_textured_quads,
+    // so as to not break the order dependence of render commands.
+    // Modified when PushQuad or PushEntry is called.
+    render_entry_textured_quads *LastTexturedQuadEntry;
+};
+
+struct opengl
+{
+    u32 Program;
+    u32 VAO;
+    u32 VBO;
+    u32 EBO;
+    s32 TransformUniformLocation;
+    u32 WhiteTexture;
     
-    f32 x = Cos(Azimuth) * Sin(Inclination);
-    f32 y = Sin(Azimuth) * Sin(Inclination);
-    f32 z = Cos(Inclination);
-    v3 RotatedP = r * V3(x, y, z);
+    render_commands RenderCommands;
     
-    v3 Result = RotatedP + Target;
+    // TODO: See how much is realistically needed
+    // This could be untyped to separate opengl and renderer
+    vertex VertexArray[KB(32)];
+    //u32 IndexArray[ArrayCount(VertexArray) * 6 / 4];
+    u32 IndexArray[KB(32)];
     
-    return Result;
-}
+    u8 PushBufferMemory[KB(128)];
+};
+
+#pragma pack(push, 1)
+struct Bitmap_Header
+{
+    // Bitmap file header
+    u16 file_type;
+    u32 file_size;
+    u16 reserved1;
+    u16 reserved2;
+    u32 file_offset;
+    
+    // bitmap info header
+    u32 header_size;
+    s32 width;
+    s32 height;
+    u16 planes;
+    u16 bits_per_pixel;
+    u32 compression;
+    u32 image_size;
+    s32 x_pixels_per_meter;
+    s32 y_pixels_per_meter;
+    u32 colours_used;
+    u32 colours_important;
+};
+#pragma pack(pop)

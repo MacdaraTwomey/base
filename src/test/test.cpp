@@ -394,16 +394,16 @@ void RunTests()
     {
         temp_arena Scratch = GetScratch();
         string String1 = StringConcat(Scratch.Arena, Strlit("ABC"), Strlit("DEF"), Strlit(""), Strlit("GH"));
-        Assert(StringsAreEqual(String1, Strlit("ABCDEFGH")));
+        Assert(StringMatch(String1, Strlit("ABCDEFGH")));
         
         string String2 = StringConcat(Scratch.Arena, Strlit("ABC"));
-        Assert(StringsAreEqual(String2, Strlit("ABC")));
+        Assert(StringMatch(String2, Strlit("ABC")));
         
         string String3 = StringConcat(Scratch.Arena, Strlit(""));
-        Assert(StringsAreEqual(String3, Strlit("")));
+        Assert(StringMatch(String3, Strlit("")));
         
         string String4 = StringConcat(Scratch.Arena);
-        Assert(StringsAreEqual(String4, Strlit("")));
+        Assert(StringMatch(String4, Strlit("")));
         
         ReleaseScratch(Scratch);
     }
@@ -512,34 +512,34 @@ void RunTests()
         RemoveExtension(&Test);
         RemoveExtension(&Dot);
         
-        Assert(StringsAreEqual(FileExe, Strlit("file"))); 
-        Assert(StringsAreEqual(TestDotTarGz, Strlit("test.tar"))); 
-        Assert(StringsAreEqual(TestDotObjDot, Strlit("test.obj"))); 
-        Assert(StringsAreEqual(TestDotDotObj, Strlit("test."))); 
-        Assert(StringsAreEqual(Test, Strlit("test"))); 
-        Assert(StringsAreEqual(Dot, Strlit(""))); 
+        Assert(StringMatch(FileExe, Strlit("file"))); 
+        Assert(StringMatch(TestDotTarGz, Strlit("test.tar"))); 
+        Assert(StringMatch(TestDotObjDot, Strlit("test.obj"))); 
+        Assert(StringMatch(TestDotDotObj, Strlit("test."))); 
+        Assert(StringMatch(Test, Strlit("test"))); 
+        Assert(StringMatch(Dot, Strlit(""))); 
         
-        Assert(StringsAreEqual(Strlit("file.exe"), FilenameFromPath(Strlit("C:/dev/test/file.exe")))); 
-        Assert(StringsAreEqual(Strlit("file.exe"), FilenameFromPath(Strlit("C://dev/test////file.exe")))); 
-        Assert(StringsAreEqual(Strlit("file.exe"), FilenameFromPath(Strlit("/c/dev/test/file.exe")))); 
-        Assert(StringsAreEqual(Strlit("file"), FilenameFromPath(Strlit("/c/dev/test/file")))); 
-        Assert(StringsAreEqual(Strlit("file"), FilenameFromPath(Strlit("/c/.dev/test //file")))); 
-        Assert(StringsAreEqual(Strlit(""), FilenameFromPath(Strlit("/c/dev/test/file/")))); 
-        Assert(StringsAreEqual(Strlit(""), FilenameFromPath(Strlit("file")))); 
-        Assert(StringsAreEqual(Strlit(""), FilenameFromPath(Strlit("/")))); 
-        Assert(StringsAreEqual(Strlit("c"), FilenameFromPath(Strlit("/c")))); 
-        Assert(StringsAreEqual(Strlit("elmo.doc"), FilenameFromPath(Strlit("C:/abc\\def//hjkl\\\\sdfsdf/elmo.doc")))); 
+        Assert(StringMatch(Strlit("file.exe"), FilenameFromPath(Strlit("C:/dev/test/file.exe")))); 
+        Assert(StringMatch(Strlit("file.exe"), FilenameFromPath(Strlit("C://dev/test////file.exe")))); 
+        Assert(StringMatch(Strlit("file.exe"), FilenameFromPath(Strlit("/c/dev/test/file.exe")))); 
+        Assert(StringMatch(Strlit("file"), FilenameFromPath(Strlit("/c/dev/test/file")))); 
+        Assert(StringMatch(Strlit("file"), FilenameFromPath(Strlit("/c/.dev/test //file")))); 
+        Assert(StringMatch(Strlit(""), FilenameFromPath(Strlit("/c/dev/test/file/")))); 
+        Assert(StringMatch(Strlit(""), FilenameFromPath(Strlit("file")))); 
+        Assert(StringMatch(Strlit(""), FilenameFromPath(Strlit("/")))); 
+        Assert(StringMatch(Strlit("c"), FilenameFromPath(Strlit("/c")))); 
+        Assert(StringMatch(Strlit("elmo.doc"), FilenameFromPath(Strlit("C:/abc\\def//hjkl\\\\sdfsdf/elmo.doc")))); 
         
-        Assert(StringsAreEqual(Strlit("C:/dev/test/"), DirectoryFromPath(Strlit("C:/dev/test/file.exe")))); 
-        Assert(StringsAreEqual(Strlit("C://dev/test////"), DirectoryFromPath(Strlit("C://dev/test////file.exe")))); 
-        Assert(StringsAreEqual(Strlit("/c/dev/test/"), DirectoryFromPath(Strlit("/c/dev/test/file.exe")))); 
-        Assert(StringsAreEqual(Strlit("/c/dev/test/"), DirectoryFromPath(Strlit("/c/dev/test/file")))); 
-        Assert(StringsAreEqual(Strlit("/c/.dev/test //"), DirectoryFromPath(Strlit("/c/.dev/test //file")))); 
-        Assert(StringsAreEqual(Strlit("/c/dev/test/file/"), DirectoryFromPath(Strlit("/c/dev/test/file/")))); 
-        Assert(StringsAreEqual(Strlit(""), DirectoryFromPath(Strlit("file")))); 
-        Assert(StringsAreEqual(Strlit("/"), DirectoryFromPath(Strlit("/")))); 
-        Assert(StringsAreEqual(Strlit("/"), DirectoryFromPath(Strlit("/c")))); 
-        Assert(StringsAreEqual(Strlit("C:/abc\\def//hjkl\\\\sdfsdf/"), DirectoryFromPath(Strlit("C:/abc\\def//hjkl\\\\sdfsdf/elmo.doc")))); 
+        Assert(StringMatch(Strlit("C:/dev/test/"), DirectoryFromPath(Strlit("C:/dev/test/file.exe")))); 
+        Assert(StringMatch(Strlit("C://dev/test////"), DirectoryFromPath(Strlit("C://dev/test////file.exe")))); 
+        Assert(StringMatch(Strlit("/c/dev/test/"), DirectoryFromPath(Strlit("/c/dev/test/file.exe")))); 
+        Assert(StringMatch(Strlit("/c/dev/test/"), DirectoryFromPath(Strlit("/c/dev/test/file")))); 
+        Assert(StringMatch(Strlit("/c/.dev/test //"), DirectoryFromPath(Strlit("/c/.dev/test //file")))); 
+        Assert(StringMatch(Strlit("/c/dev/test/file/"), DirectoryFromPath(Strlit("/c/dev/test/file/")))); 
+        Assert(StringMatch(Strlit(""), DirectoryFromPath(Strlit("file")))); 
+        Assert(StringMatch(Strlit("/"), DirectoryFromPath(Strlit("/")))); 
+        Assert(StringMatch(Strlit("/"), DirectoryFromPath(Strlit("/c")))); 
+        Assert(StringMatch(Strlit("C:/abc\\def//hjkl\\\\sdfsdf/"), DirectoryFromPath(Strlit("C:/abc\\def//hjkl\\\\sdfsdf/elmo.doc")))); 
         
         temp_arena Scratch = GetScratch();
         
@@ -551,41 +551,41 @@ void RunTests()
         StringListAppend(Scratch.Arena, &List, Strlit("Here."));
         
         string WholeString = StringListJoin(Scratch.Arena, &List);
-        Assert(StringsAreEqual(WholeString, Strlit("Hello World I Am Here.")));
+        Assert(StringMatch(WholeString, Strlit("Hello World I Am Here.")));
         
         string_list List2 = {};
-        Assert(StringsAreEqual(StringListJoin(Scratch.Arena, &List2), Strlit("")));
+        Assert(StringMatch(StringListJoin(Scratch.Arena, &List2), Strlit("")));
         
         ReleaseScratch(Scratch);
         
         
         
-        Assert(StringsAreEqual(StringPrefix(Strlit("ABCDEF"), 3), Strlit("ABC")));
-        Assert(StringsAreEqual(StringPrefix(Strlit("ABCDEF"), 6), Strlit("ABCDEF")));
-        Assert(StringsAreEqual(StringPrefix(Strlit("ABCDEF"), 10), Strlit("ABCDEF")));
-        Assert(StringsAreEqual(StringPrefix(Strlit("ABCDEF"), 0), Strlit("")));
-        Assert(StringsAreEqual(StringPrefix(Strlit(""), 1), Strlit("")));
+        Assert(StringMatch(StringPrefix(Strlit("ABCDEF"), 3), Strlit("ABC")));
+        Assert(StringMatch(StringPrefix(Strlit("ABCDEF"), 6), Strlit("ABCDEF")));
+        Assert(StringMatch(StringPrefix(Strlit("ABCDEF"), 10), Strlit("ABCDEF")));
+        Assert(StringMatch(StringPrefix(Strlit("ABCDEF"), 0), Strlit("")));
+        Assert(StringMatch(StringPrefix(Strlit(""), 1), Strlit("")));
         
-        Assert(StringsAreEqual(StringSuffix(Strlit("ABCDEF"), 3), Strlit("DEF")));
-        Assert(StringsAreEqual(StringSuffix(Strlit("ABCDEF"), 5), Strlit("BCDEF")));
-        Assert(StringsAreEqual(StringSuffix(Strlit("ABCDEF"), 10), Strlit("ABCDEF")));
-        Assert(StringsAreEqual(StringSuffix(Strlit("ABCDEF"), 0), Strlit("")));
-        Assert(StringsAreEqual(StringSuffix(Strlit(""), 1), Strlit("")));
+        Assert(StringMatch(StringSuffix(Strlit("ABCDEF"), 3), Strlit("DEF")));
+        Assert(StringMatch(StringSuffix(Strlit("ABCDEF"), 5), Strlit("BCDEF")));
+        Assert(StringMatch(StringSuffix(Strlit("ABCDEF"), 10), Strlit("ABCDEF")));
+        Assert(StringMatch(StringSuffix(Strlit("ABCDEF"), 0), Strlit("")));
+        Assert(StringMatch(StringSuffix(Strlit(""), 1), Strlit("")));
         
-        Assert(StringsAreEqual(SubstrRange(Strlit("ABCDEF"), 0, 6), Strlit("ABCDEF")));
-        Assert(StringsAreEqual(SubstrRange(Strlit("ABCDEF"), 1, 3), Strlit("BC")));
-        Assert(StringsAreEqual(SubstrRange(Strlit("ABCDEF"), 3, 3), Strlit("")));
-        Assert(StringsAreEqual(SubstrRange(Strlit("ABCDEF"), 3, 4), Strlit("D")));
-        Assert(StringsAreEqual(SubstrRange(Strlit("ABCDEF"), 3, 10), Strlit("DEF")));
-        Assert(StringsAreEqual(SubstrRange(Strlit("ABCDEF"), 10, 10), Strlit("")));
-        Assert(StringsAreEqual(SubstrRange(Strlit(""), 0, 1), Strlit("")));
+        Assert(StringMatch(SubstrRange(Strlit("ABCDEF"), 0, 6), Strlit("ABCDEF")));
+        Assert(StringMatch(SubstrRange(Strlit("ABCDEF"), 1, 3), Strlit("BC")));
+        Assert(StringMatch(SubstrRange(Strlit("ABCDEF"), 3, 3), Strlit("")));
+        Assert(StringMatch(SubstrRange(Strlit("ABCDEF"), 3, 4), Strlit("D")));
+        Assert(StringMatch(SubstrRange(Strlit("ABCDEF"), 3, 10), Strlit("DEF")));
+        Assert(StringMatch(SubstrRange(Strlit("ABCDEF"), 10, 10), Strlit("")));
+        Assert(StringMatch(SubstrRange(Strlit(""), 0, 1), Strlit("")));
         
-        Assert(StringsAreEqual(Substr(Strlit("ABCDEF"), 4, 1), Strlit("E")));
-        Assert(StringsAreEqual(Substr(Strlit("ABCDEF"), 2, 3), Strlit("CDE")));
-        Assert(StringsAreEqual(Substr(Strlit("ABCDEF"), 5, 10), Strlit("F")));
-        Assert(StringsAreEqual(Substr(Strlit("ABCDEF"), 6, 1), Strlit("")));
-        Assert(StringsAreEqual(Substr(Strlit("ABCDEF"), 1, 0), Strlit("")));
-        Assert(StringsAreEqual(Substr(Strlit(""), 0, 1), Strlit("")));
+        Assert(StringMatch(Substr(Strlit("ABCDEF"), 4, 1), Strlit("E")));
+        Assert(StringMatch(Substr(Strlit("ABCDEF"), 2, 3), Strlit("CDE")));
+        Assert(StringMatch(Substr(Strlit("ABCDEF"), 5, 10), Strlit("F")));
+        Assert(StringMatch(Substr(Strlit("ABCDEF"), 6, 1), Strlit("")));
+        Assert(StringMatch(Substr(Strlit("ABCDEF"), 1, 0), Strlit("")));
+        Assert(StringMatch(Substr(Strlit(""), 0, 1), Strlit("")));
         
         FreeArena(Arena);
     }

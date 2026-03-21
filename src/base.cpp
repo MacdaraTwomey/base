@@ -310,25 +310,7 @@ temp_arena GetScratchImpl(u32 ConflictCount, conflicting_arena_array Conflicts)
     
     return BeginTempArena(Result);
 }
-#if 0
-temp_arena GetScratch()
-{
-    return GetScratchImpl(0, 0);
-}
 
-temp_arena GetScratch(arena *Arena)
-{
-    return GetScratchImpl(&Arena, 1);
-}
-
-temp_arena GetScratch(arena *Arena1, arena *Arena2)
-{
-    arena *ArenaArray[2] = {Arena1, Arena2};
-    return GetScratchImpl(ArenaArray, 2);
-}
-#else
-
-#endif
 void ReleaseScratch(temp_arena ScratchMemory)
 {
     Assert(ScratchMemory.Arena == GlobalScratchArenaPool[0] || 
@@ -723,7 +705,7 @@ bool StringContainsStr(string String, string Substr)
     return ContainsSubstr;
 }
 
-bool StringsAreEqual(string A, string B)
+bool StringMatch(string A, string B)
 {
     bool Result = (A.Length == B.Length);
     if (Result)
@@ -741,7 +723,7 @@ bool StringsAreEqual(string A, string B)
     return Result;
 }
 
-bool StringsAreEqualCaseInsensitive(string a, string b)
+bool StringMatchCaseInsensitive(string a, string b)
 {
     bool Result = (a.Length == b.Length);
     if (Result)
