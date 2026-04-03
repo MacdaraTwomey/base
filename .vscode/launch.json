@@ -8,11 +8,12 @@
             "name": "Debug from linux",
             "type": "lldb",
             "request": "launch",
-            "program": "${workspaceFolder}/target/test",
+            "program": "${workspaceFolder}/target/base",
             "cwd": "${workspaceFolder}",
             //"env": {"LD_LIBRARY_PATH": "target"},
             //"args": ["target/test"],
-            //"terminal": "integrated"
+            "terminal": "integrated",
+            "preLaunchTask": "buildLinux",
         },
         {
             // This debugs programs compiled with clang.exe (and probably MSVC).
@@ -20,16 +21,17 @@
             "name": "Debug from windows",
             "type": "cppvsdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/target/test",
+            "program": "${workspaceFolder}/target/base",
             "symbolSearchPath": "${workspaceFolder}/code",
             "console": false,
             "visualizerFile": "${workspaceFolder}/my.natvis",
+            "preLaunchTask": "build",
         },
         {
             "type": "lldb-dap",
             "request": "launch",
             "name": "LLDB DAP",
-            "program": "${workspaceFolder}/target/test",
+            "program": "${workspaceFolder}/target/base",
             "args": [ "test" ],
             "env": {
                 "ASAN_OPTIONS": "detect_leaks=0",

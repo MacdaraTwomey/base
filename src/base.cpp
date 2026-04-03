@@ -150,7 +150,7 @@ void *PushSize_(arena *Arena, u64 Size, u32 Alignment, u32 ArenaPushFlags)
     
     u64 Apron = 0;
 #if ASAN_ENABLED
-    Alignment = Maximum(8, Alignment);
+    Alignment = Max(8, Alignment);
     // Size of poisoned memory before and after allocation
     Apron = ClampTop(Size * 4, 1024);
 #endif
@@ -554,7 +554,7 @@ string StringPrefix(string String, u64 N)
 
 string StringSuffix(string String, u64 N)
 {
-    u64 SuffixLength = Minimum(N, String.Length);
+    u64 SuffixLength = Min(N, String.Length);
     String.Str += (String.Length - SuffixLength);
     String.Length = SuffixLength;
     return String;
@@ -925,7 +925,7 @@ void Error_PushMessage(string Message) {
     error_msg *Error = PushStruct(GlobalErrorArena, error_msg);
     Error->Message = PushString(GlobalErrorArena, Message);
     Error->ArenaPos = GlobalErrorArena->Pos;
-    DLL_PUSH_TAIL(GlobalErrorListHead, GlobalErrorListTail, Error);
+    DLLPushTail(GlobalErrorListHead, GlobalErrorListTail, Error);
 }
 
 void Error_PushMessagef(char *Format, ...) {
@@ -943,14 +943,14 @@ void Error_PushMessagef(char *Format, ...) {
     error_msg *Error = PushStruct(GlobalErrorArena, error_msg);
     Error->Message = PushString(GlobalErrorArena, Message);
     Error->ArenaPos = GlobalErrorArena->Pos;
-    DLL_PUSH_TAIL(GlobalErrorListHead, GlobalErrorListTail, Error);
+    DLLPushTail(GlobalErrorListHead, GlobalErrorListTail, Error);
 }
 
 string Error_PopMessage(arena *Arena) {
     string Message = {};
     error_msg *Error = GlobalErrorListTail;
     if (Error) {
-        DLL_POP_TAIL(GlobalErrorListHead, GlobalErrorListTail);
+        DLLRemove(GlobalErrorListHead, GlobalErrorListTail, Error);
         Message = PushString(Arena, Error->Message);
         PopToPosition(GlobalErrorArena, Error->ArenaPos);
     }

@@ -151,24 +151,23 @@ void BaseAssertPrint_(const char *Format, ...);
 #else
 // In this instance we don't want to macro expand Cond, so that we can print our macros without substitution.
 #  define Assert(Cond) \
-do { \
-if (!static_cast<bool>((Cond))) { \
-BaseAssertPrint_("%s:%s():%i: Assertion: `%s' failed.\n", __FILE__, __func__, __LINE__, #Cond); \
-BASE_DEBUG_TRAP(); \
-} \
-} while(0) 
-
+    do { \
+        if (!static_cast<bool>((Cond))) { \
+            BaseAssertPrint_("%s:%s():%i: Assertion: `%s' failed.\n", __FILE__, __func__, __LINE__, #Cond); \
+            BASE_DEBUG_TRAP(); \
+        } \
+    } while(0) 
 #endif
 
 ///////////////////////////////////////////////////////////////////////
 // Helpers
 //
 
-#define Minimum(a, b) ((a) < (b) ? (a) : (b))
-#define Maximum(a, b) ((a) > (b) ? (a) : (b))
+#define Min(a, b) ((a) < (b) ? (a) : (b))
+#define Max(a, b) ((a) > (b) ? (a) : (b))
 #define Clamp(Value, Low, High) (((Value) < (Low)) ? (Low) : ((Value) > (High)) ? (High) : (Value))
-#define ClampTop(a, b)    Minimum((a), (b))
-#define ClampBottom(a, b) Maximum((a), (b))
+#define ClampTop(a, b)    Min((a), (b))
+#define ClampBottom(a, b) Max((a), (b))
 
 #define KB(n) ((n) * 1024LLU)
 #define MB(n) KB((n) * 1024LLU)
@@ -181,10 +180,74 @@ constexpr size_t ArrayCount(T(&)[n])
     return n;
 }
 
-#define SLL_APPEND(Head, Tail, Node) ((Tail) = (Tail) ? ((Tail)->Next = Node) : ((Head) = Node))
+static void *SLLPopImpl(void **Head, void **Tail, void **HeadNext) {
+    Assert(*Head);
+    Assert(*Tail);
 
-#define DLL_PUSH_TAIL(Head, Tail, Node) ((Tail) = ((Tail) ? (Node)->Prev = (Tail), (Tail)->Next = (Node) : (Head) = (Node)))
-#define DLL_POP_TAIL(Head, Tail) ((Tail) == (Head) ? (Tail) = 0, (Head) = 0 : (Tail) = (Tail)->Prev)
+    void *Node = *Head;
+    if (*Head == *Tail) {
+        *Tail = 0;
+    }
+    // This either assigns 0 (if there was one element in the list) or the new head
+    *Head = *HeadNext;
+    *HeadNext = 0;
+    return Node;
+}
+
+static void *DLLPopImpl(void **Head, void **Tail, void **NodeNext, void **NodePrev) {
+    Assert(*Head);
+    Assert(*Tail);
+
+    void *Node = *Head;
+    if (*Head == *Tail) {
+        *Tail = 0;
+    }
+
+    // This either assigns 0 (if there was one element in the list) or the new head
+    *Head = *NodeNext;
+    *NodeNext = 0;
+    *NodePrev = 0;
+
+    return Node;
+}
+
+// Nodes next and prev pointers are zeroed on pop rather than push, because usually newly allocated things are getting pushed.
+// And its nicer to assume its non pointing at some junk after its popped.
+
+#define SLLPushTail_N(Head, Tail, Node, Next) ((Tail) = ((Tail) ? (Tail)->Next = (Node) : (Head) = (Node)))
+#define SLLPushHead_N(Head, Tail, Node, Next) ((Head) = ((Head) ? (Node)->Next = (Head), (Node) : (Tail) = (Node)))
+
+// Pops and returns a node from head from list, list must not be empty
+#define SLLPopHead_N(Head, Tail, Next) \
+    ((decltype(Head))SLLPopImpl((void **)&(Head), (void **)&(Tail), (void **)&((Head)->Next)))
+
+#define DLLPushTail_NP(Head, Tail, Node, Next, Prev) ((Tail) = ((Tail) ? (Node)->Prev = (Tail), (Tail)->Next = (Node) : (Head) = (Node)))
+#define DLLPushHead_NP(Head, Tail, Node, Next, Prev) ((Head) = ((Head) ? (Node)->Next = (Head), (Head)->Prev = (Node) : (Tail) = (Node)))
+
+// Removes a node from the list, doesn't return anything
+// Must not pass Head or Tail arguments as Node also (pointers can be the same just not variables).
+#define DLLRemove_NP(Head, Tail, Node, Next, Prev) \
+     ((((Head) == (Node)) ? ((Head) = (Node)->Next) : ((Node)->Prev->Next = (Node)->Next)), \
+     (((Tail) == (Node)) ? ((Tail) = (Node)->Prev) : ((Node)->Next->Prev = (Node)->Prev)), \
+     ((Node)->Next = 0, (Node)->Prev = 0, 0))
+
+#define DLLPopHead_NP(Head, Tail, Next, Prev) \
+    ((decltype(Head))DLLPopImpl((void **)&(Head), (void **)&(Tail), (void **)&((Head)->Next), (void **)&((Head)->Prev)))
+
+#define DLLPopTail_NP(Head, Tail, Next, Prev) \
+    ((decltype(Head))DLLPopImpl((void **)&(Tail), (void **)&(Head), (void **)&((Tail)->Prev), (void **)&((Tail)->Next)))
+
+    
+#define SLLPushTail(Head, Tail, Node) SLLPushTail_N(Head, Tail, Node, Next)
+#define SLLPushHead(Head, Tail, Node) SLLPushHead_N(Head, Tail, Node, Next)
+#define SLLPopHead(Head, Tail) SLLPopHead_N(Head, Tail, Next)
+
+#define DLLPushTail(Head, Tail, Node) DLLPushTail_NP(Head, Tail, Node, Next, Prev)
+#define DLLPushHead(Head, Tail, Node) DLLPushHead_NP(Head, Tail, Node, Next, Prev)
+#define DLLRemove(Head, Tail, Node)  DLLRemove_NP(Head, Tail, Node, Next, Prev)
+#define DLLPopHead(Head, Tail)  DLLPopHead_NP(Head, Tail, Next, Prev)
+#define DLLPopTail(Head, Tail)  DLLPopTail_NP(Head, Tail, Next, Prev)
+
 
 #define DECIMAL_DIGIT_COUNT_MAX(type) (241 * sizeof(type) / 100 + 1)
 
