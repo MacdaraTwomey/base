@@ -435,7 +435,7 @@ string PushStringfArgs(arena *Arena, char *Format, va_list Args)
 }
 
 
-string PushStringf(arena *Arena, char *Format, ...)
+string PushStringf(char *Format, ...)
 {
     va_list Args;
     va_start (Args, Format);
@@ -608,7 +608,7 @@ u64 StringCountOccurence(string String, u8 Char)
 }
 
 // Offest has a default value of 0
-u64 StringFindChar(string String, u8 Char, u32 Offset)
+u64 StringFindChar(string String, u8 Char, u64 Offset)
 {
     u64 Position = String.Length;
     for (u64 i = Offset; i < String.Length; ++i)
