@@ -438,7 +438,7 @@ void   StringToLower(string *String);
 void   StringToUpper(string *String);
 
 u64    StringCountOccurence(string String, u8 Char);
-u64    StringFindChar(string String, u8 Char, u32 Offset=0);
+u64    StringFindChar(string String, u8 Char, u64 Offset=0);
 u64    StringFindLastChar(string String, u8 Char);
 u64    StringFindStr(string Haystack, string Needle);
 bool   StringContainsChar(string String, u8 Char);

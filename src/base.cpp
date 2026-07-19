@@ -435,7 +435,7 @@ string PushStringfArgs(arena *Arena, char *Format, va_list Args)
 }
 
 
-string PushStringf(char *Format, ...)
+string PushStringf(arena *Arena, char *Format, ...)
 {
     va_list Args;
     va_start (Args, Format);
